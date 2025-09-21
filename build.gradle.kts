@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "me.Short.TheosisEconomy"
-version = "1.44"
+version = "1.45"
 
 tasks {
     build {
