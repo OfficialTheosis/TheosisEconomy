@@ -379,6 +379,7 @@ messages:
     cannot-pay-yourself: "<red>You cannot pay yourself.</red>"
 
     # When the "/balancetop" command is used, but there are no entries
+    #      - <total> will be replaced with the total balance of the server
     no-baltop-entries: |-
       <aqua>Total:</aqua> <light_purple><total></light_purple>
       <red>There are no balances to show.</red>
