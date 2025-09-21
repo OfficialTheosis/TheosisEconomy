@@ -75,13 +75,11 @@ public class BalancetopCommand implements TabExecutor
                 specifiedPage = 1;
             }
 
-            // Initial output (header and combined total balance)
+            // Initial output (header)
             Component output = miniMessage.deserialize(config.getString("messages.baltop.header"),
                             Placeholder.component("page", Component.text(specifiedPage)),
-                            Placeholder.component("pages", Component.text(pages)))
-                            .appendNewline()
-                            .append(miniMessage.deserialize(config.getString("messages.baltop.total"),
-                            Placeholder.component("total", Component.text(economy.format(instance.getCombinedTotalBalance().doubleValue())))));
+                            Placeholder.component("pages", Component.text(pages)),
+                            Placeholder.component("total", Component.text(economy.format(instance.getCombinedTotalBalance().doubleValue()))));
 
             int startPoint = (specifiedPage - 1) * pageLength;
 
@@ -130,17 +128,14 @@ public class BalancetopCommand implements TabExecutor
             // Send the total, along with the "no-baltop-entries" message
             if (sender instanceof Player)
             {
-                ((Player) sender).spigot().sendMessage(instance.getBungeeComponentSerializer().serialize(miniMessage.deserialize(config.getString("messages.baltop.total"),
-                                Placeholder.component("total", Component.text(economy.format(instance.getCombinedTotalBalance().doubleValue()))))
-                                .appendNewline()
-                                .append(miniMessage.deserialize(config.getString("messages.error.no-baltop-entries")))));
+
+                ((Player) sender).spigot().sendMessage(instance.getBungeeComponentSerializer().serialize(miniMessage.deserialize(config.getString("messages.error.no-baltop-entries"),
+                                Placeholder.component("total", Component.text(economy.format(instance.getCombinedTotalBalance().doubleValue()))))));
             }
             else
             {
-                sender.sendMessage(instance.getLegacyComponentSerializer().serialize(miniMessage.deserialize(config.getString("messages.baltop.total"),
-                                Placeholder.component("total", Component.text(economy.format(instance.getCombinedTotalBalance().doubleValue()))))
-                                .appendNewline()
-                                .append(miniMessage.deserialize(config.getString("messages.error.no-baltop-entries")))));
+                sender.sendMessage(instance.getLegacyComponentSerializer().serialize(miniMessage.deserialize(config.getString("messages.error.no-baltop-entries"),
+                                Placeholder.component("total", Component.text(economy.format(instance.getCombinedTotalBalance().doubleValue()))))));
             }
         }
 

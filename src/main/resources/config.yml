@@ -302,11 +302,10 @@ messages:
     # The header
     #      - <page> will be replaced with the current page
     #      - <pages> will be replaced with the total number of pages
-    header: "<gray>----------(<green>Top Balances (Page: <gold><page></gold>/<gold><pages></gold>)</green>)----------</gray>"
-
-    # Combined total balance of the server (excluding banned players if "exclude-banned-players" is set to "true")
     #      - <total> will be replaced with the total balance of the server
-    total: "<aqua>Total:</aqua> <light_purple><total></light_purple>"
+    header: |-
+      <gray>----------(<green>Top Balances (Page: <gold><page></gold>/<gold><pages></gold>)</green>)----------</gray>
+      <aqua>Total:</aqua> <light_purple><total></light_purple>
 
     # What each entry will look like
     #      - <position> will be replaced with the player's leaderboard position
@@ -380,7 +379,9 @@ messages:
     cannot-pay-yourself: "<red>You cannot pay yourself.</red>"
 
     # When the "/balancetop" command is used, but there are no entries
-    no-baltop-entries: "<red>There are no balances to show.</red>"
+    no-baltop-entries: |-
+      <aqua>Total:</aqua> <light_purple><total></light_purple>
+      <red>There are no balances to show.</red>
 
     # When a player-targetting command is run that would result in the target's balance exceeding the server's maximum balance
     #      - <target> will be replaced with the target's username

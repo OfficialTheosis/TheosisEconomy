@@ -35,18 +35,18 @@ repositories {
 dependencies {
     implementation("org.bstats:bstats-bukkit:3.0.2")
 
-    implementation("net.kyori:adventure-api:4.20.0")
-    implementation("net.kyori:adventure-text-minimessage:4.20.0")
-    implementation("net.kyori:adventure-platform-bukkit:4.3.4")
-    implementation("net.kyori:adventure-text-serializer-plain:4.21.0")
+    implementation("net.kyori:adventure-api:4.24.0")
+    implementation("net.kyori:adventure-text-minimessage:4.24.0")
+    implementation("net.kyori:adventure-platform-bukkit:4.4.1")
+    implementation("net.kyori:adventure-text-serializer-plain:4.24.0")
 
-    implementation("org.apache.commons:commons-text:1.13.1")
+    implementation("org.apache.commons:commons-text:1.14.0")
     implementation("org.apache.commons:commons-collections4:4.5.0")
 
-    implementation("com.google.code.gson:gson:2.13.1")
+    implementation("com.google.code.gson:gson:2.13.2")
 
-    compileOnly("org.spigotmc:spigot-api:1.13.2-R0.1-SNAPSHOT")
+    compileOnly("org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7.1")
-    compileOnly("com.gitlab.ruany:LiteBansAPI:0.5.0")
+    compileOnly("com.gitlab.ruany:LiteBansAPI:0.6.1")
     compileOnly("me.clip:placeholderapi:2.11.6")
 }
