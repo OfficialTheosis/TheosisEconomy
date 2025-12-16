@@ -163,7 +163,8 @@ settings:
       #       - <player> will be replaced with the player's username
       #       - <uuid> will be replaced with the player's UUID
       #       - <amount> will be replaced with the amount withdrawn
-      message: "Withdrew <amount> from <player>'s (<uuid>) balance."
+      #       - <balance> will be replaced with the player's resulting balance
+      message: "Withdrew <amount> from <player>'s (<uuid>) balance. They now have <balance>."
 
     # When a plugin tells TheosisEconomy to withdraw money from a player's balance, but the operation fails because either the player does not have sufficient funds, the amount uses more decimal places than what the currency is configured to use, or is negative
     vault-withdraw-fail:
@@ -190,7 +191,8 @@ settings:
       #       - <player> will be replaced with the player's username
       #       - <uuid> will be replaced with the player's UUID
       #       - <amount> will be replaced with the amount deposited
-      message: "Deposited <amount> to <player>'s (<uuid>) balance."
+      #       - <balance> will be replaced with the player's resulting balance
+      message: "Deposited <amount> to <player>'s (<uuid>) balance. They now have <balance>."
 
     # When a plugin tells TheosisEconomy to deposit money to a player's balance, but the operation fails because either it would result in the player's balance exceeding the configured maximum, the amount uses more decimal places than what the currency is configured to use, or is negative
     vault-deposit-fail:

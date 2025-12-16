@@ -158,7 +158,8 @@ public class Economy implements net.milkbowl.vault.economy.Economy
                         instance.getLogger().log(Level.INFO, config.getString("settings.logging.vault-withdraw-success.message")
                                 .replace("<player>", player.getName())
                                 .replace("<uuid>", uuid.toString())
-                                .replace("<amount>", bdAmount.toPlainString()));
+                                .replace("<amount>", bdAmount.toPlainString())
+                                .replace("<balance>", resultingBalance.toPlainString()));
                     }
 
                     return new EconomyResponse(bdAmountDoubleValue, resultingBalance.doubleValue(), ResponseType.SUCCESS, null);
@@ -245,7 +246,8 @@ public class Economy implements net.milkbowl.vault.economy.Economy
                         instance.getLogger().log(Level.INFO, config.getString("settings.logging.vault-deposit-success.message")
                                 .replace("<player>", player.getName())
                                 .replace("<uuid>", uuid.toString())
-                                .replace("<amount>", bdAmount.toPlainString()));
+                                .replace("<amount>", bdAmount.toPlainString())
+                                .replace("<balance>", resultingBalance.toPlainString()));
                     }
 
                     return new EconomyResponse(bdAmountDoubleValue, resultingBalance.doubleValue(), ResponseType.SUCCESS, null);
