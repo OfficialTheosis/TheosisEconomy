@@ -82,7 +82,7 @@ public class PlaceholderAPI extends PlaceholderExpansion
 
                 if (position <= baltopEntries.size())
                 {
-                    return Bukkit.getOfflinePlayer(baltopEntries.get(position - 1).getKey()).getName();
+                    return instance.getOfflinePlayerNames().get(baltopEntries.get(position - 1).getKey());
                 }
 
                 return instance.getConfig().getString("settings.placeholders.baltop-position-name-none");
@@ -170,12 +170,13 @@ public class PlaceholderAPI extends PlaceholderExpansion
 
                 if (position <= baltopEntries.size())
                 {
-                    OfflinePlayer entryPlayer = Bukkit.getOfflinePlayer(baltopEntries.get(position - 1).getKey());
+                    Map.Entry<UUID, BigDecimal> baltopEntry = baltopEntries.get(position - 1);
+                    OfflinePlayer entryPlayer = Bukkit.getOfflinePlayer(baltopEntry.getKey());
 
                     String entry = instance.getConfig().getString(player == entryPlayer ? "messages.baltop.entry-you" : "messages.baltop.entry")
                             .replace("<position>", Integer.toString(position))
                             .replace("<player>", entryPlayer.getName())
-                            .replace("<balance>", instance.getEconomy().format(baltopEntries.get(position - 1).getValue().doubleValue()));
+                            .replace("<balance>", instance.getEconomy().format(baltopEntry.getValue().doubleValue()));
 
                     return entry
                             .replace("<dots>", new String(new char[Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(instance.getMiniMessage().deserialize(entry)), true)]).replace("\0", "."));
@@ -200,12 +201,13 @@ public class PlaceholderAPI extends PlaceholderExpansion
 
                 if (position <= baltopEntries.size())
                 {
-                    OfflinePlayer entryPlayer = Bukkit.getOfflinePlayer(baltopEntries.get(position - 1).getKey());
+                    Map.Entry<UUID, BigDecimal> baltopEntry = baltopEntries.get(position - 1);
+                    OfflinePlayer entryPlayer = Bukkit.getOfflinePlayer(baltopEntry.getKey());
 
                     String entry = instance.getConfig().getString(player == entryPlayer ? "messages.baltop.entry-you" : "messages.baltop.entry")
                             .replace("<position>", Integer.toString(position))
                             .replace("<player>", entryPlayer.getName())
-                            .replace("<balance>", instance.getEconomy().format(baltopEntries.get(position - 1).getValue().doubleValue()));
+                            .replace("<balance>", instance.getEconomy().format(baltopEntry.getValue().doubleValue()));
 
                     return instance.getLegacyComponentSerializer().serialize(instance.getMiniMessage().deserialize(entry
                             .replace("<dots>", new String(new char[Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(instance.getMiniMessage().deserialize(entry)), true)]).replace("\0", "."))));

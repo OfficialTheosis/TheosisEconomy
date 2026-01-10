@@ -198,6 +198,12 @@ public class TheosisEconomy extends JavaPlugin
 
         // Schedule task to periodically save any dirty player accounts to JSON files
         scheduledSaveTask = saveDirtyPlayerAccountsScheduler.schedule(this::runSaveDirtyPlayerAccountsLoop, getConfig().getLong("settings.player-accounts-save-frequency"), TimeUnit.SECONDS);
+
+        // REMOVE WHEN DONE
+        for (Map.Entry<UUID, PlayerAccount> playerAccount : playerAccounts.entrySet())
+        {
+            getDirtyPlayerAccountSnapshots().put(playerAccount.getKey(), playerAccount.getValue().snapshot());
+        }
     }
 
     @Override
@@ -394,7 +400,7 @@ public class TheosisEconomy extends JavaPlugin
             Map<UUID, BigDecimal> unsortedBaltop = new HashMap<>();
             BigDecimal total = BigDecimal.ZERO;
 
-            // Get player names and their balances in no particular order, excluding banned players if config.yml says to not include them - the "Bukkit.getOfflinePlayer(uuid).isBanned()" is the only thing here that might not be safe to run async, but no issues so far in testing
+            // Get player names and their balances in no particular order, excluding banned players if config.yml says to not include them - the `Bukkit.getOfflinePlayer(uuid).isBanned()` is the only thing here that might not be safe to run async, but no issues so far in testing
             for (UUID uuid : playerAccounts.keySet())
             {
                 OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
