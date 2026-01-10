@@ -3,34 +3,25 @@ package me.Short.TheosisEconomy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonIOException;
+import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import litebans.api.Database;
 import me.Short.TheosisEconomy.Commands.BalanceCommand;
-import me.Short.TheosisEconomy.Commands.BalancetopCommand;
+import me.Short.TheosisEconomy.Commands.BalanceTopCommand;
 import me.Short.TheosisEconomy.Commands.EconomyCommand;
 import me.Short.TheosisEconomy.Commands.PayCommand;
-import me.Short.TheosisEconomy.Commands.PaytoggleCommand;
-import me.Short.TheosisEconomy.Events.PreBaltopSortEvent;
+import me.Short.TheosisEconomy.Commands.PayToggleCommand;
+import me.Short.TheosisEconomy.Events.BalanceTopSortEvent;
 import me.Short.TheosisEconomy.Listeners.PlayerJoinListener;
-import me.Short.TheosisEconomy.Listeners.ServerLoadListener;
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
-import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
-import net.kyori.adventure.text.serializer.bungeecord.BungeeComponentSerializer;
-import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
-import net.kyori.adventure.text.serializer.json.JSONOptions;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.milkbowl.vault.permission.Permission;
-import org.apache.commons.collections4.map.CaseInsensitiveMap;
-import org.apache.commons.lang3.tuple.MutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.entity.Player;
-import org.bukkit.map.MinecraftFont;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -85,14 +76,14 @@ public class TheosisEconomy extends JavaPlugin
     // Instance of the Vault Permissions API
     private Permission permissions;
 
-    // Cache of all player UUIDs (who have joined before) - this is so that offline players can easily be retrieved from their usernames
-    private Map<String, UUID> playerCache;
+    // Cache of all players' usernames, for the purpose of offline player tab completion
+    private Map<UUID, String> offlinePlayerNames;
 
     // Cache of all player accounts
     private Map<UUID, PlayerAccount> playerAccounts;
 
     // Baltop
-    private Map<String, BigDecimal> baltop;
+    private Map<UUID, BigDecimal> baltop;
 
     // Combined total of all players' balances - updated in "updateBaltop"
     private BigDecimal combinedTotalBalance;
@@ -103,10 +94,7 @@ public class TheosisEconomy extends JavaPlugin
     // Instance of the MiniMessage API
     private MiniMessage miniMessage;
 
-    // Instance of the BungeeComponentSerializer API - this is to convert Adventure Components to Bungee/legacy Components (BaseComponents), since we want Spigot compatibility
-    private BungeeComponentSerializer bungeeComponentSerializer;
-
-    // Instance of the LegacyComponentSerializer API - this is to convert Adventure Components to legacy text, for sending to non-Player CommandSenders (since in the Spigot API prior to 1.12, there is no "CommandSender.spigot()" method
+    // Instance of the LegacyComponentSerializer API
     private LegacyComponentSerializer legacyComponentSerializer;
 
     // Whether LiteBans is installed - for checking in the "updateBaltop" method
@@ -151,9 +139,6 @@ public class TheosisEconomy extends JavaPlugin
         // Hook into Vault Permissions
         permissions = getServer().getServicesManager().getRegistration(Permission.class).getProvider();
 
-        // Set initial "playerCache" value to an empty case-insensitive map
-        playerCache = new CaseInsensitiveMap<>();
-
         // Set initial "baltop" value to an empty linked hashmap
         baltop = new LinkedHashMap<>();
 
@@ -166,25 +151,29 @@ public class TheosisEconomy extends JavaPlugin
         // Get instance of the LegacyComponentSerializer API
         legacyComponentSerializer = LegacyComponentSerializer.legacySection();
 
-        // Get instance of the BungeeComponentSerializer API - the additional options make it so that hover events work on Minecraft versions prior to 1.16
-        bungeeComponentSerializer = BungeeComponentSerializer.of(GsonComponentSerializer.builder().editOptions(options -> options.value(JSONOptions.EMIT_HOVER_EVENT_TYPE, JSONOptions.HoverEventValueMode.BOTH)).build(), legacyComponentSerializer);
-
-        // Get config options from config.yml here, so they don't need to be gotten in the async "updateBaltop" method later
+        // Get config options from config.yml here, so they don't need to be retrieved in the async "updateBaltop" method later
         baltopConsiderExcludePermission = getConfig().getBoolean("settings.baltop.consider-exclude-permission");
         baltopExcludeBannedPlayers = getConfig().getBoolean("settings.baltop.exclude-banned-players");
         baltopMinBalance = new BigDecimal(getConfig().getString("settings.baltop.min-balance"));
 
         // Register events
         PluginManager pluginManager = getServer().getPluginManager();
-        pluginManager.registerEvents(new ServerLoadListener(this), this);
         pluginManager.registerEvents(new PlayerJoinListener(this), this);
 
         // Register commands
-        getCommand("economy").setExecutor(new EconomyCommand(this));
-        getCommand("balance").setExecutor(new BalanceCommand(this));
-        getCommand("pay").setExecutor(new PayCommand(this));
-        getCommand("paytoggle").setExecutor(new PaytoggleCommand(this));
-        getCommand("balancetop").setExecutor(new BalancetopCommand(this));
+        this.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, commands ->
+        {
+            Commands registrar = commands.registrar();
+
+            // Basic commands
+            registrar.register(getConfig().getString("settings.commands.paytoggle.name"), getConfig().getString("settings.commands.paytoggle.description"), getConfig().getStringList("settings.commands.paytoggle.aliases"), new PayToggleCommand(this));
+
+            // Non-basic commands
+            registrar.register(BalanceCommand.createCommand(getConfig().getString("settings.commands.balance.name"), this), getConfig().getString("settings.commands.balance.description"), getConfig().getStringList("settings.commands.balance.aliases"));
+            registrar.register(BalanceTopCommand.createCommand(getConfig().getString("settings.commands.balancetop.name"), this), getConfig().getString("settings.commands.balancetop.description"), getConfig().getStringList("settings.commands.balancetop.aliases"));
+            registrar.register(PayCommand.createCommand(getConfig().getString("settings.commands.pay.name"), this), getConfig().getString("settings.commands.pay.description"), getConfig().getStringList("settings.commands.pay.aliases"));
+            registrar.register(EconomyCommand.createCommand(getConfig().getString("settings.commands.economy.name"), this), getConfig().getString("settings.commands.economy.description"), getConfig().getStringList("settings.commands.economy.aliases"));
+        });
 
         // Register PlaceholderAPI placeholders, if PlaceholderAPI is installed
         if (pluginManager.getPlugin("PlaceholderAPI") != null)
@@ -197,6 +186,9 @@ public class TheosisEconomy extends JavaPlugin
 
         // bStats
         Metrics metrics = new Metrics(this, 13836);
+
+        // Cache all offline player names
+        offlinePlayerNames = cacheOfflinePlayerNames();
 
         // Cache all players' UUIDs and their account data
         playerAccounts = cachePlayerAccounts();
@@ -219,7 +211,7 @@ public class TheosisEconomy extends JavaPlugin
     }
 
     // Method to set up "logFileHandler" and set it to this plugin's logger
-    public void setupLogFileHandler()
+    private void setupLogFileHandler()
     {
         try
         {
@@ -234,6 +226,19 @@ public class TheosisEconomy extends JavaPlugin
         {
             throw new RuntimeException(exception);
         }
+    }
+
+    // Method to cache all offline player names
+    private Map<UUID, String> cacheOfflinePlayerNames()
+    {
+        Map<UUID, String> offlinePlayerNames = new ConcurrentHashMap<>();
+
+        for (OfflinePlayer player : Bukkit.getOfflinePlayers())
+        {
+            offlinePlayerNames.put(player.getUniqueId(), player.getName());
+        }
+
+        return offlinePlayerNames;
     }
 
     // Method to cache all player accounts from their respective JSON files in the "player-accounts" folder - also migrates any files in the old "data.yml" file if it exists
@@ -263,7 +268,7 @@ public class TheosisEconomy extends JavaPlugin
                 // Add snapshots to `dirtyPlayerAccountSnapshots`
                 for (String uuid : data.getKeys(false))
                 {
-                    dirtyPlayerAccountSnapshots.put(UUID.fromString(uuid), new PlayerAccountSnapshot(new BigDecimal(data.getString(uuid + ".balance")), data.getBoolean(uuid + ".acceptingPayments"), data.contains(uuid + ".lastKnownUsername") ? data.getString(uuid + ".lastKnownUsername") : null));
+                    dirtyPlayerAccountSnapshots.put(UUID.fromString(uuid), new PlayerAccountSnapshot(new BigDecimal(data.getString(uuid + ".balance")), data.getBoolean(uuid + ".acceptingPayments")));
                 }
 
                 // Save
@@ -320,24 +325,24 @@ public class TheosisEconomy extends JavaPlugin
     }
 
     // Method to schedule the repeating baltop update task
-    public void scheduleBaltopUpdateTask()
+    private void scheduleBaltopUpdateTask()
     {
         // Call "updateBaltop" on a schedule (frequency defined in config.yml) and set "baltop" and "combinedTotalBalance" to its results
         updateBaltopTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(this, () ->
         {
-            // Create PreBaltopSortEvent instance with an initial empty HashSet of excluded players' UUIDs
-            PreBaltopSortEvent preBaltopSortEvent = new PreBaltopSortEvent(new HashSet<>());
+            // Create BalanceTopSortEvent instance with an initial empty HashSet of excluded players' UUIDs
+            BalanceTopSortEvent balanceTopSortEvent = new BalanceTopSortEvent(new HashSet<>());
 
             // Call the event
-            Bukkit.getServer().getPluginManager().callEvent(preBaltopSortEvent);
+            Bukkit.getServer().getPluginManager().callEvent(balanceTopSortEvent);
 
             // Call "updateBaltop", passing in the HashSet of excluded players' UUIDs, if the event was NOT cancelled
-            if (!preBaltopSortEvent.isCancelled())
+            if (!balanceTopSortEvent.isCancelled())
             {
-                updateBaltop(preBaltopSortEvent.getExcludedPlayers()).thenAccept(pair ->
+                updateBaltop(balanceTopSortEvent.getExcludedPlayers()).thenAccept(pair ->
                 {
-                    setBaltop(pair.getLeft());
-                    setCombinedTotalBalance(pair.getRight());
+                    baltop = pair.getLeft();
+                    combinedTotalBalance = pair.getRight();
                 });
             }
         }, 0L, getConfig().getLong("settings.baltop.update-task-frequency"));
@@ -382,11 +387,11 @@ public class TheosisEconomy extends JavaPlugin
     }
 
     // Method to update baltop async
-    public CompletableFuture<MutablePair<Map<String, BigDecimal>, BigDecimal>> updateBaltop(Set<UUID> excludedPlayers)
+    private CompletableFuture<Pair<Map<UUID, BigDecimal>, BigDecimal>> updateBaltop(Set<UUID> excludedPlayers)
     {
         return CompletableFuture.supplyAsync(() ->
         {
-            Map<String, BigDecimal> unsortedBaltop = new HashMap<>();
+            Map<UUID, BigDecimal> unsortedBaltop = new HashMap<>();
             BigDecimal total = BigDecimal.ZERO;
 
             // Get player names and their balances in no particular order, excluding banned players if config.yml says to not include them - the "Bukkit.getOfflinePlayer(uuid).isBanned()" is the only thing here that might not be safe to run async, but no issues so far in testing
@@ -403,80 +408,19 @@ public class TheosisEconomy extends JavaPlugin
 
                     if (balance.compareTo(baltopMinBalance) >= 0)
                     {
-                        unsortedBaltop.put(account.getLastKnownUsername(), balance);
+                        unsortedBaltop.put(uuid, balance);
                     }
                 }
             }
 
             // Create and return sorted version of "unsortedBaltop"
-            LinkedHashMap<String, BigDecimal> sortedBaltop = new LinkedHashMap<>();
+            LinkedHashMap<UUID, BigDecimal> sortedBaltop = new LinkedHashMap<>();
             unsortedBaltop.entrySet().stream()
                     .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
                     .forEach(entry -> sortedBaltop.put(entry.getKey(), entry.getValue()));
 
-            return new MutablePair<>(sortedBaltop, total);
+            return Pair.of(sortedBaltop, total);
         });
-    }
-
-    // Method to send a MiniMessage-formatted string as BaseComponents to a CommandSender, with no tag resolvers
-    public void sendMiniMessage(CommandSender sender, String message)
-    {
-        if (!message.isEmpty())
-        {
-            Component messageComponent = miniMessage.deserialize(message);
-
-            if (sender instanceof Player)
-            {
-                ((Player) sender).spigot().sendMessage(bungeeComponentSerializer.serialize(messageComponent));
-            }
-            else
-            {
-                sender.sendMessage(legacyComponentSerializer.serialize(messageComponent));
-            }
-        }
-    }
-
-    // Method to send a MiniMessage-formatted string as BaseComponents to a CommandSender, WITH tag resolvers
-    public void sendMiniMessage(CommandSender sender, String message, TagResolver... tagResolvers)
-    {
-        if (!message.isEmpty())
-        {
-            Component messageComponent = miniMessage.deserialize(message, tagResolvers);
-
-            if (sender instanceof Player)
-            {
-                ((Player) sender).spigot().sendMessage(bungeeComponentSerializer.serialize(messageComponent));
-            }
-            else
-            {
-                sender.sendMessage(legacyComponentSerializer.serialize(messageComponent));
-            }
-        }
-    }
-
-    // Method to round a value to the number of decimal places that the currency is configured to use
-    public BigDecimal round(BigDecimal value)
-    {
-        FileConfiguration config = getConfig();
-
-        RoundingMode mode = RoundingMode.valueOf(config.getString("settings.currency.rounding-mode"));
-
-        if (mode == RoundingMode.ROUND_NEAREST)
-        {
-            return value.setScale(economy.fractionalDigits(), java.math.RoundingMode.HALF_UP);
-        }
-
-        if (mode == RoundingMode.ROUND_UP)
-        {
-            return value.setScale(economy.fractionalDigits(), java.math.RoundingMode.UP);
-        }
-
-        if (mode == RoundingMode.ROUND_DOWN)
-        {
-            return value.setScale(economy.fractionalDigits(), java.math.RoundingMode.DOWN);
-        }
-
-        return value;
     }
 
     // Method to reload the config and data files
@@ -487,7 +431,7 @@ public class TheosisEconomy extends JavaPlugin
         // Reload config.yml from disk
         reloadConfig();
 
-        // Re-get values from config that were gotten in "onEnable"
+        // Re-get values from config that were retrieved in "onEnable"
         baltopConsiderExcludePermission = getConfig().getBoolean("settings.baltop.consider-exclude-permission");
         baltopExcludeBannedPlayers = getConfig().getBoolean("settings.baltop.exclude-banned-players");
         baltopMinBalance = new BigDecimal(getConfig().getString("settings.baltop.min-balance"));
@@ -559,17 +503,6 @@ public class TheosisEconomy extends JavaPlugin
         scheduleBaltopUpdateTask();
     }
 
-    // Method to return the number of dots needed to align the end of a string after "<dots>"
-    public int getNumberOfDotsToAlign(String message, boolean isForPlayer)
-    {
-        if (isForPlayer)
-        {
-            return Math.round((130F - MinecraftFont.Font.getWidth(message.substring(0, message.indexOf("<dots>") - 1))) / 2);
-        }
-
-        return Math.round((130F - MinecraftFont.Font.getWidth(message.substring(0, message.indexOf("<dots>") - 1))) / 6) + 7;
-    }
-
     // ----- Getters -----
 
     // Getter for "dirtyPlayerAccountSnapshots"
@@ -584,10 +517,10 @@ public class TheosisEconomy extends JavaPlugin
         return economy;
     }
 
-    // Getter for "playerCache"
-    public Map<String, UUID> getPlayerCache()
+    // Getter for ""
+    public Map<UUID, String> getOfflinePlayerNames()
     {
-        return playerCache;
+        return offlinePlayerNames;
     }
 
     // Getter for "playerAccounts"
@@ -597,7 +530,7 @@ public class TheosisEconomy extends JavaPlugin
     }
 
     // Getter for "baltop"
-    public Map<String, BigDecimal> getBaltop()
+    public Map<UUID, BigDecimal> getBaltop()
     {
         return baltop;
     }
@@ -614,30 +547,10 @@ public class TheosisEconomy extends JavaPlugin
         return miniMessage;
     }
 
-    // Getter for "bungeeComponentSerializer"
-    public BungeeComponentSerializer getBungeeComponentSerializer()
-    {
-        return bungeeComponentSerializer;
-    }
-
     // Getter for "legacyComponentSerializer"
     public LegacyComponentSerializer getLegacyComponentSerializer()
     {
         return legacyComponentSerializer;
-    }
-
-    // ----- Setters -----
-
-    // Setter for "baltop"
-    public void setBaltop(Map<String, BigDecimal> baltop)
-    {
-        this.baltop = baltop;
-    }
-
-    // Setter for "combinedTotalBalance"
-    public void setCombinedTotalBalance(BigDecimal combinedTotalBalance)
-    {
-        this.combinedTotalBalance = combinedTotalBalance;
     }
 
 }

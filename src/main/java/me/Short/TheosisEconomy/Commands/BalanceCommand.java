@@ -1,130 +1,87 @@
 package me.Short.TheosisEconomy.Commands;
 
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.tree.LiteralCommandNode;
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
+import me.Short.TheosisEconomy.CustomCommandArguments.CachedOfflinePlayerArgument;
 import me.Short.TheosisEconomy.TheosisEconomy;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import net.milkbowl.vault.economy.Economy;
-import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabExecutor;
 import org.bukkit.entity.Player;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-
-public class BalanceCommand implements TabExecutor
+@NullMarked
+public class BalanceCommand
 {
 
-    // Instance of "TheosisEconomy"
-    private TheosisEconomy instance;
-
-    // Constructor
-    public BalanceCommand(TheosisEconomy instance)
+    public static LiteralCommandNode<CommandSourceStack> createCommand(final String commandName, TheosisEconomy instance)
     {
-        this.instance = instance;
+        return Commands.literal(commandName)
+
+                // Require permission
+                .requires(sender -> sender.getSender().hasPermission("theosiseconomy.command.balance"))
+
+                .executes(ctx ->
+                {
+                    // Execute command logic if no target player was specified
+                    executeCommandLogic(instance, ctx, null);
+
+                    return Command.SINGLE_SUCCESS;
+                })
+
+                .then(Commands.argument("target player", new CachedOfflinePlayerArgument(instance))
+
+                        // Require permission
+                        .requires(sender -> sender.getSender().hasPermission("theosiseconomy.command.balance.others"))
+
+                        // Command logic if a target player was specified
+                        .executes(ctx ->
+                        {
+                            // Execute command logic
+                            executeCommandLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class));
+
+                            return Command.SINGLE_SUCCESS;
+                        })
+                ).build();
     }
 
-    @Override
-    public boolean onCommand(CommandSender sender, Command command,	String label, String[] args)
+    // Method to execute the command logic
+    private static void executeCommandLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, @Nullable OfflinePlayer target)
     {
-        if (args.length > 0)
+        final CommandSender sender = ctx.getSource().getSender();
+
+        if (target == null)
         {
-            if (sender.hasPermission("theosiseconomy.command.balance.others"))
+            if (!(sender instanceof Player))
             {
-                // Try to get target player
-                OfflinePlayer target = Bukkit.getPlayer(args[0]);
-                if (target == null) // Target is not online, so now we check the cache to see if they have joined before...
-                {
-                    UUID uuid = instance.getPlayerCache().get(args[0]);
-                    if (uuid != null)
-                    {
-                        target = Bukkit.getOfflinePlayer(uuid);
-                    }
-                }
+                sender.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.console-cannot-use")));
 
-                if (target != null)
-                {
-                    Economy economy = instance.getEconomy();
+                return;
+            }
 
-                    if (economy.hasAccount(target))
-                    {
-                        double balance = economy.getBalance(target);
-
-                        if (target != sender)
-                        {
-                            instance.sendMiniMessage(sender, instance.getConfig().getString("messages.balance.their-balance"),
-                                    Placeholder.component("target", Component.text(target.getName())),
-                                    Placeholder.component("balance", Component.text(economy.format(balance))));
-                        }
-                        else
-                        {
-                            instance.sendMiniMessage(sender, instance.getConfig().getString("messages.balance.your-balance"),
-                                    Placeholder.component("balance", Component.text(economy.format(balance))));
-                        }
-                    }
-                    else
-                    {
-                        instance.sendMiniMessage(sender, instance.getConfig().getString("messages.error.no-account-other"),
-                                Placeholder.component("target", Component.text(target.getName())));
-                    }
-                }
-                else
-                {
-                    instance.sendMiniMessage(sender, instance.getConfig().getString("messages.error.not-joined-before"),
-                            Placeholder.component("username", Component.text(args[0])));
-                }
-            }
-            else
-            {
-                instance.sendMiniMessage(sender, instance.getConfig().getString("messages.error.no-permission"));
-            }
-        }
-        else
-        {
-            if (sender instanceof Player)
-            {
-                Player player = (Player) sender;
-                Economy economy = instance.getEconomy();
-
-                if (economy.hasAccount(player))
-                {
-                    instance.sendMiniMessage(player, instance.getConfig().getString("messages.balance.your-balance"),
-                            Placeholder.component("balance", Component.text(economy.format(economy.getBalance(player)))));
-                }
-                else
-                {
-                    instance.sendMiniMessage(player, instance.getConfig().getString("messages.error.no-account"));
-                }
-            }
-            else
-            {
-                instance.sendMiniMessage(sender, instance.getConfig().getString("messages.error.console-cannot-use"));
-            }
+            target = (Player) sender;
         }
 
-        return true;
-    }
+        net.milkbowl.vault.economy.Economy economy = instance.getEconomy();
 
-    @Override
-    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args)
-    {
-        List<String> suggestions = new ArrayList<>();
-        if (args.length == 1 && sender.hasPermission("theosiseconomy.command.balance.others"))
+        // If the target player does not have an account, return
+        if (!economy.hasAccount(target))
         {
-            for (Player player : Bukkit.getOnlinePlayers())
-            {
-                String playerName = player.getName();
-                if (playerName != null && playerName.toUpperCase().startsWith(args[0].toUpperCase()))
-                {
-                    suggestions.add(playerName);
-                }
-            }
+            sender.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString(target != sender ? "messages.error.no-account-other" : "messages.error.no-account"),
+                    Placeholder.component("target", Component.text(target.getName()))));
+
+            return;
         }
 
-        return !suggestions.isEmpty() ? suggestions : null;
+        // Send message to the command sender telling them the target's balance
+        sender.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString(target != sender ? "messages.balance.their-balance" : "messages.balance.your-balance"),
+                Placeholder.component("target", Component.text(target.getName())),
+                Placeholder.component("balance", Component.text(economy.format(economy.getBalance(target))))));
     }
 
 }

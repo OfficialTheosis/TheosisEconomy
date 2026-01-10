@@ -70,6 +70,49 @@ settings:
     # Default: false
     exclude-banned-players: false
 
+  # Settings related to commands
+  commands:
+
+    # The "/balance" command
+    balance:
+
+      # The command name - this is what players will need to type after "/" to execute this command
+      name: "balance"
+
+      # The description of the command
+      description: "Check your own or another player's balance."
+
+      # Alternative names players can use to execute this command
+      aliases:
+        - "bal"
+        - "money"
+
+    # The "/balancetop" command
+    balancetop:
+      name: "balancetop"
+      description: "Display the balances of players from richest to poorest."
+      aliases:
+        - "baltop"
+
+    # The "/pay" command
+    pay:
+      name: "pay"
+      description: "Pay another player a specified amount of money."
+      aliases: []
+
+    # The "/paytoggle" command
+    paytoggle:
+      name: "paytoggle"
+      description: "Toggle whether you want to be able to receive money from other players with /pay."
+      aliases: []
+
+    # The "/economy" command
+    economy:
+      name: "economy"
+      description: "Manage the economy."
+      aliases:
+        - "eco"
+
   # Settings related to PlaceholderAPI placeholders
   placeholders:
 
@@ -352,8 +395,9 @@ messages:
     no-permission: "<red>You do not have permission to do that.</red>"
 
     # When a command is used incorrectly
-    #      - <usage> will be replaced with the correct command usage
-    incorrect-usage: "<red>Usage: <gold><usage></gold></red>"
+    #      - <command> will be replaced with the root command that the player used
+    #      - <argument_usage> will be replaced with correct usage of the command's arguments
+    incorrect-usage: "<red>Usage:</red> <gold><command> <argument_usage></gold>"
 
     # When the console tries to use a command in a way that it can't (e.g. tries to check its own balance with "/balance")
     console-cannot-use: "<red>Only players can do that.</red>"

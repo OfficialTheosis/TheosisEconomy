@@ -9,20 +9,17 @@ public class PlayerAccount
 
     private boolean acceptingPayments;
 
-    private String lastKnownUsername;
-
     // Constructor
-    public PlayerAccount(BigDecimal balance, boolean acceptingPayments, String lastKnownUsername)
+    public PlayerAccount(BigDecimal balance, boolean acceptingPayments)
     {
         this.balance = balance;
         this.acceptingPayments = acceptingPayments;
-        this.lastKnownUsername = lastKnownUsername;
     }
 
     // Method to get a `PlayerAccountSnapshot` of this `PlayerAccount`
     public PlayerAccountSnapshot snapshot()
     {
-        return new PlayerAccountSnapshot(balance, acceptingPayments, lastKnownUsername);
+        return new PlayerAccountSnapshot(balance, acceptingPayments);
     }
 
     // ----- Getters -----
@@ -39,12 +36,6 @@ public class PlayerAccount
         return acceptingPayments;
     }
 
-    // Getter for 'lastKnownUsername'
-    public String getLastKnownUsername()
-    {
-        return lastKnownUsername;
-    }
-
     // ----- Setters -----
 
     // Setter for "balance"
@@ -57,12 +48,6 @@ public class PlayerAccount
     public void setAcceptingPayments(boolean acceptingPayments)
     {
         this.acceptingPayments = acceptingPayments;
-    }
-
-    // Setter for "lastKnownUsername"
-    public void setLastKnownUsername(String lastKnownUsername)
-    {
-        this.lastKnownUsername = lastKnownUsername;
     }
 
 }

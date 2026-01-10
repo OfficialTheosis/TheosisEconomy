@@ -1,0 +1,94 @@
+name: TheosisEconomy
+version: 2.0.0
+main: me.Short.TheosisEconomy.TheosisEconomy
+description: A simple, yet customisable and robust, Vault-based economy provider.
+api-version: '1.21.11'
+
+dependencies:
+  server:
+    Vault:
+      load: BEFORE
+      required: true
+      join-classpath: true
+    PlaceholderAPI:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    LiteBans:
+      load: BEFORE
+      required: false
+      join-classpath: true
+
+permissions:
+
+  theosiseconomy.*:
+    description: "All TheosisEconomy permissions."
+    default: op
+
+  theosiseconomy.balancetop.exclude:
+    description: "Players with this permission will be excluded from the /balancetop list, if enabled in config.yml."
+    default: op
+
+  theosiseconomy.command.*:
+    description: "Access to all TheosisEconomy commands and sub-commands."
+    default: op
+    children:
+      theosiseconomy.command.economy.*: true
+      theosiseconomy.command.balance: true
+      theosiseconomy.command.balance.others: true
+      theosiseconomy.command.pay: true
+
+  theosiseconomy.command.economy.*:
+    description: "Access to /economy and all of its sub-commands."
+    default: op
+    children:
+      theosiseconomy.command.economy: true
+      theosiseconomy.command.economy.set: true
+      theosiseconomy.command.economy.give: true
+      theosiseconomy.command.economy.take: true
+      theosiseconomy.command.economy.reset: true
+      theosiseconomy.command.economy.reload: true
+
+  theosiseconomy.command.economy:
+    description: "Access to /economy."
+    default: op
+
+  theosiseconomy.command.economy.set:
+    description: "Access to /economy set <player> <amount>."
+    default: op
+
+  theosiseconomy.command.economy.give:
+    description: "Access to /economy give <player> <amount>."
+    default: op
+
+  theosiseconomy.command.economy.take:
+    description: "Access to /economy take <player> <amount>."
+    default: op
+
+  theosiseconomy.command.economy.reset:
+    description: "Access to /economy reset <player>."
+    default: op
+
+  theosiseconomy.command.economy.reload:
+    description: "Access to /economy reload."
+    default: op
+
+  theosiseconomy.command.balance:
+    description: "Access to /balance."
+    default: true
+
+  theosiseconomy.command.balance.others:
+    description: "Access to /balance [player]."
+    default: true
+
+  theosiseconomy.command.balancetop:
+    description: "Access to /balancetop."
+    default: true
+
+  theosiseconomy.command.pay:
+    description: "Access to /pay."
+    default: true
+
+  theosiseconomy.command.paytoggle:
+    description: "Access to /paytoggle."
+    default: true

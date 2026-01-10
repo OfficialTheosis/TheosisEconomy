@@ -3,11 +3,12 @@ package me.Short.TheosisEconomy.Events;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Set;
 import java.util.UUID;
 
-public class PreBaltopSortEvent extends Event implements Cancellable
+public class BalanceTopSortEvent extends Event implements Cancellable
 {
     private static final HandlerList handlers = new HandlerList();
 
@@ -16,7 +17,7 @@ public class PreBaltopSortEvent extends Event implements Cancellable
     // Set of UUIDs of players who will be excluded from baltop
     private Set<UUID> excludedPlayers;
 
-    public PreBaltopSortEvent(Set<UUID> excludedPlayers)
+    public BalanceTopSortEvent(Set<UUID> excludedPlayers)
     {
         this.excludedPlayers = excludedPlayers;
     }
@@ -34,7 +35,7 @@ public class PreBaltopSortEvent extends Event implements Cancellable
     }
 
     @Override
-    public HandlerList getHandlers()
+    public @NonNull HandlerList getHandlers()
     {
         return handlers;
     }
