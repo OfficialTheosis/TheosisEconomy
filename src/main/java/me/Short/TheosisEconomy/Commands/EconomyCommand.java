@@ -72,7 +72,7 @@ public class EconomyCommand
 
                                         .executes(ctx ->
                                         {
-                                            executeSetLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), BigDecimal.valueOf(ctx.getArgument("amount", double.class)));
+                                            executeSetLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), BigDecimal.valueOf(ctx.getArgument("amount", double.class)).stripTrailingZeros());
 
                                             return Command.SINGLE_SUCCESS;
                                         })
@@ -111,7 +111,7 @@ public class EconomyCommand
 
                                         .executes(ctx ->
                                         {
-                                            executeGiveLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), BigDecimal.valueOf(ctx.getArgument("amount", double.class)));
+                                            executeGiveLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), BigDecimal.valueOf(ctx.getArgument("amount", double.class)).stripTrailingZeros());
 
                                             return Command.SINGLE_SUCCESS;
                                         })
@@ -150,7 +150,7 @@ public class EconomyCommand
 
                                         .executes(ctx ->
                                         {
-                                            executeTakeLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), BigDecimal.valueOf(ctx.getArgument("amount", double.class)));
+                                            executeTakeLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), BigDecimal.valueOf(ctx.getArgument("amount", double.class)).stripTrailingZeros());
 
                                             return Command.SINGLE_SUCCESS;
                                         })
@@ -317,7 +317,7 @@ public class EconomyCommand
             }
             else if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorNotGreaterThanZero()))
             {
-                ctx.getSource().getSender().sendMessage(instance.getConfig().getString("messages.error.not-greater-than-zero-amount"));
+                ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.not-greater-than-zero-amount")));
             }
             else // This should never be able to happen
             {

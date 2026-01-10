@@ -80,7 +80,7 @@ public class PayCommand
 
                                 .executes(ctx ->
                                 {
-                                    executeCommandLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), BigDecimal.valueOf(ctx.getArgument("amount", double.class)));
+                                    executeCommandLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), BigDecimal.valueOf(ctx.getArgument("amount", double.class)).stripTrailingZeros());
 
                                     return Command.SINGLE_SUCCESS;
                                 })
