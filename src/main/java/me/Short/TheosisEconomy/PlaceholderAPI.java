@@ -5,13 +5,13 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.apache.commons.lang3.StringUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 public class PlaceholderAPI extends PlaceholderExpansion
@@ -29,19 +29,19 @@ public class PlaceholderAPI extends PlaceholderExpansion
     @Override
     public @NotNull String getIdentifier()
     {
-        return instance.getDescription().getName();
+        return instance.getPluginMeta().getName();
     }
 
     @Override
     public @NotNull String getAuthor()
     {
-        return instance.getDescription().getAuthors().get(0);
+        return instance.getPluginMeta().getAuthors().getFirst();
     }
 
     @Override
     public @NotNull String getVersion()
     {
-        return instance.getDescription().getVersion();
+        return instance.getPluginMeta().getVersion();
     }
 
     @Override
@@ -78,11 +78,11 @@ public class PlaceholderAPI extends PlaceholderExpansion
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_name", ""));
 
-                List<Map.Entry<String, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
+                List<Map.Entry<UUID, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
 
                 if (position <= baltopEntries.size())
                 {
-                    return baltopEntries.get(position - 1).getKey();
+                    return instance.getOfflinePlayerNames().get(baltopEntries.get(position - 1).getKey());
                 }
 
                 return instance.getConfig().getString("settings.placeholders.baltop-position-name-none");
@@ -100,11 +100,11 @@ public class PlaceholderAPI extends PlaceholderExpansion
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_uuid", ""));
 
-                List<Map.Entry<String, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
+                List<Map.Entry<UUID, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
 
                 if (position <= baltopEntries.size())
                 {
-                    return instance.getPlayerCache().get(baltopEntries.get(position - 1).getKey()).toString();
+                    return baltopEntries.get(position - 1).getKey().toString();
                 }
 
                 return instance.getConfig().getString("settings.placeholders.baltop-position-uuid-none");
@@ -122,7 +122,7 @@ public class PlaceholderAPI extends PlaceholderExpansion
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_balance", ""));
 
-                List<Map.Entry<String, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
+                List<Map.Entry<UUID, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
 
                 if (position <= baltopEntries.size())
                 {
@@ -144,7 +144,7 @@ public class PlaceholderAPI extends PlaceholderExpansion
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_balance_formatted", ""));
 
-                List<Map.Entry<String, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
+                List<Map.Entry<UUID, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
 
                 if (position <= baltopEntries.size())
                 {
@@ -166,20 +166,20 @@ public class PlaceholderAPI extends PlaceholderExpansion
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_entry", ""));
 
-                List<Map.Entry<String, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
+                List<Map.Entry<UUID, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
 
                 if (position <= baltopEntries.size())
                 {
-                    String entryPlayerName = baltopEntries.get(position - 1).getKey();
-                    Player entryPlayer = Bukkit.getPlayer(entryPlayerName);
+                    Map.Entry<UUID, BigDecimal> baltopEntry = baltopEntries.get(position - 1);
+                    OfflinePlayer entryPlayer = Bukkit.getOfflinePlayer(baltopEntry.getKey());
 
-                    String entry = instance.getConfig().getString(entryPlayer != null && player == entryPlayer ? "messages.baltop.entry-you" : "messages.baltop.entry")
+                    String entry = instance.getConfig().getString(player == entryPlayer ? "messages.baltop.entry-you" : "messages.baltop.entry")
                             .replace("<position>", Integer.toString(position))
-                            .replace("<player>", entryPlayerName)
-                            .replace("<balance>", instance.getEconomy().format(baltopEntries.get(position - 1).getValue().doubleValue()));
+                            .replace("<player>", entryPlayer.getName())
+                            .replace("<balance>", instance.getEconomy().format(baltopEntry.getValue().doubleValue()));
 
                     return entry
-                            .replace("<dots>", new String(new char[instance.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(instance.getMiniMessage().deserialize(entry)), true)]).replace("\0", "."));
+                            .replace("<dots>", new String(new char[Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(instance.getMiniMessage().deserialize(entry)), true)]).replace("\0", "."));
                 }
 
                 return instance.getConfig().getString("settings.placeholders.baltop-position-entry-none");
@@ -197,20 +197,20 @@ public class PlaceholderAPI extends PlaceholderExpansion
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_entry_legacy", ""));
 
-                List<Map.Entry<String, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
+                List<Map.Entry<UUID, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
 
                 if (position <= baltopEntries.size())
                 {
-                    String entryPlayerName = baltopEntries.get(position - 1).getKey();
-                    Player entryPlayer = Bukkit.getPlayer(entryPlayerName);
+                    Map.Entry<UUID, BigDecimal> baltopEntry = baltopEntries.get(position - 1);
+                    OfflinePlayer entryPlayer = Bukkit.getOfflinePlayer(baltopEntry.getKey());
 
-                    String entry = instance.getConfig().getString(entryPlayer != null && player == entryPlayer ? "messages.baltop.entry-you" : "messages.baltop.entry")
+                    String entry = instance.getConfig().getString(player == entryPlayer ? "messages.baltop.entry-you" : "messages.baltop.entry")
                             .replace("<position>", Integer.toString(position))
-                            .replace("<player>", entryPlayerName)
-                            .replace("<balance>", instance.getEconomy().format(baltopEntries.get(position - 1).getValue().doubleValue()));
+                            .replace("<player>", entryPlayer.getName())
+                            .replace("<balance>", instance.getEconomy().format(baltopEntry.getValue().doubleValue()));
 
                     return instance.getLegacyComponentSerializer().serialize(instance.getMiniMessage().deserialize(entry
-                            .replace("<dots>", new String(new char[instance.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(instance.getMiniMessage().deserialize(entry)), true)]).replace("\0", "."))));
+                            .replace("<dots>", new String(new char[Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(instance.getMiniMessage().deserialize(entry)), true)]).replace("\0", "."))));
                 }
 
                 return instance.getConfig().getString("settings.placeholders.baltop-position-entry-legacy-none");

@@ -5,6 +5,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Cancellable;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
+import org.jspecify.annotations.NonNull;
 
 import java.math.BigDecimal;
 
@@ -43,7 +44,7 @@ public class PlayerPayPlayerEvent extends Event implements Cancellable
     }
 
     @Override
-    public HandlerList getHandlers()
+    public @NonNull HandlerList getHandlers()
     {
         return handlers;
     }

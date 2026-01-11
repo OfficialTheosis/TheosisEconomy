@@ -1,226 +1,232 @@
 package me.Short.TheosisEconomy.Commands;
 
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.tree.LiteralCommandNode;
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
+import me.Short.TheosisEconomy.CustomCommandArguments.CachedOfflinePlayerArgument;
 import me.Short.TheosisEconomy.Events.PlayerPayPlayerEvent;
 import me.Short.TheosisEconomy.TheosisEconomy;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
-import net.milkbowl.vault.economy.EconomyResponse.ResponseType;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabExecutor;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
+import org.jspecify.annotations.NullMarked;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
 
-public class PayCommand implements TabExecutor
+@NullMarked
+public class PayCommand
 {
 
-    // Instance of "TheosisEconomy"
-    private TheosisEconomy instance;
-
-    // Constructor
-    public PayCommand(TheosisEconomy instance)
+    public static LiteralCommandNode<CommandSourceStack> createCommand(final String commandName, TheosisEconomy instance)
     {
-        this.instance = instance;
-    }
+        return Commands.literal(commandName)
 
-    @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args)
-    {
-        if (sender instanceof Player)
-        {
-            if (args.length > 0)
-            {
-                // Try to get target player
-                OfflinePlayer target = Bukkit.getPlayer(args[0]);
-                if (target == null) // Target is not online, so now we check the cache to see if they have joined before...
+                // Require permission
+                .requires(sender -> sender.getSender().hasPermission("theosiseconomy.command.pay"))
+
+                .executes(ctx ->
                 {
-                    UUID uuid = instance.getPlayerCache().get(args[0]);
-                    if (uuid != null)
-                    {
-                        target = Bukkit.getOfflinePlayer(uuid);
-                    }
-                }
+                    // Send the sender a message showing the command usage of this branch
+                    ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
+                            Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
+                            Placeholder.component("argument_usage", Component.text("<player name> <amount>"))));
 
-                if (target != null)
-                {
-                    if (sender != target)
-                    {
-                        Player player = (Player) sender;
-                        Economy economy = instance.getEconomy();
+                    return Command.SINGLE_SUCCESS;
+                })
 
-                        if (economy.hasAccount((player)))
+                .then(Commands.argument("target player", new CachedOfflinePlayerArgument(instance))
+
+                        .suggests((ctx, builder) -> CompletableFuture.supplyAsync(() ->
                         {
-                            if (economy.hasAccount(target))
+                            if (ctx.getSource().getSender() instanceof Player senderPlayer)
                             {
-                                if (instance.getPlayerAccounts().get(target.getUniqueId()).getAcceptingPayments())
-                                {
-                                    if (args.length > 1)
-                                    {
-                                        // Try to parse BigDecimal amount from the command argument
-                                        BigDecimal amount;
-                                        try
-                                        {
-                                            amount = new BigDecimal(args[1]);
-                                        }
-                                        catch (NumberFormatException exception)
-                                        {
-                                            instance.sendMiniMessage(sender, instance.getConfig().getString("messages.error.invalid-amount"),
-                                                    Placeholder.component("amount", Component.text(args[1])));
-
-                                            return true;
-                                        }
-
-                                        // Call PlayerPayPlayerEvent event
-                                        PlayerPayPlayerEvent playerPayPlayerEvent = new PlayerPayPlayerEvent(player, target, amount);
-                                        Bukkit.getServer().getPluginManager().callEvent(playerPayPlayerEvent);
-
-                                        if (!playerPayPlayerEvent.isCancelled())
-                                        {
-                                            // Reassign variables in case a plugin listening for the event changed them
-                                            player = playerPayPlayerEvent.getSender();
-                                            target = playerPayPlayerEvent.getRecipient();
-                                            amount = playerPayPlayerEvent.getAmount();
-
-                                            double amountAsDouble = amount.doubleValue(); // For passing into the Economy methods, as they only take doubles
-
-                                            // Try to withdraw the amount from the payer
-                                            EconomyResponse withdrawPlayerResponse = economy.withdrawPlayer(player, amountAsDouble);
-
-                                            if (withdrawPlayerResponse.type == ResponseType.SUCCESS)
-                                            {
-                                                // Try to deposit the amount to the target
-                                                EconomyResponse depositPlayerResponse = economy.depositPlayer(target, amountAsDouble);
-
-                                                if (depositPlayerResponse.type == ResponseType.SUCCESS)
-                                                {
-                                                    FileConfiguration config = instance.getConfig();
-
-                                                    String amountFormatted = economy.format(depositPlayerResponse.amount);
-
-                                                    // Send message to the target player, if online
-                                                    if (target.isOnline())
-                                                    {
-                                                        instance.sendMiniMessage(target.getPlayer(), config.getString("messages.pay.paid-target"),
-                                                                Placeholder.component("player", Component.text(player.getName())),
-                                                                Placeholder.component("amount", Component.text(amountFormatted)));
-                                                    }
-
-                                                    // Send message to the command sender
-                                                    instance.sendMiniMessage(player, config.getString("messages.pay.paid-sender"),
-                                                            Placeholder.component("target", Component.text(target.getName())),
-                                                            Placeholder.component("amount", Component.text(amountFormatted)));
-                                                }
-                                                else // If the deposit was unsuccessful...
-                                                {
-                                                    // Deposit the amount back into the payer's account
-                                                    economy.depositPlayer(player, amountAsDouble);
-
-                                                    // Send error message - this is the only possible error, since the other errors were ruled out because the withdrawal was successful
-                                                    instance.sendMiniMessage(player, instance.getConfig().getString("messages.error.would-exceed-max-balance"),
-                                                            Placeholder.component("target", Component.text(target.getName())));
-                                                }
-                                            }
-                                            else // If the withdrawal was unsuccessful...
-                                            {
-                                                String errorMessage = withdrawPlayerResponse.errorMessage;
-
-                                                if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorInsufficientFunds()))
-                                                {
-                                                    instance.sendMiniMessage(player, instance.getConfig().getString("messages.error.insufficient-funds"),
-                                                            Placeholder.component("amount", Component.text(economy.format(amountAsDouble))));
-                                                }
-                                                else if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorTooManyDecimalPlaces()))
-                                                {
-                                                    instance.sendMiniMessage(player, instance.getConfig().getString("messages.error.too-many-decimal-places-amount"),
-                                                            Placeholder.component("amount", Component.text(amount.toPlainString())),
-                                                            Placeholder.component("decimal_places", Component.text(economy.fractionalDigits())));
-                                                }
-                                                else if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorNotGreaterThanZero()))
-                                                {
-                                                    instance.sendMiniMessage(player, instance.getConfig().getString("messages.error.not-greater-than-zero-amount"));
-                                                }
-                                            }
-                                        }
-                                        else
-                                        {
-                                            return true;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        instance.sendMiniMessage(player, instance.getConfig().getString("messages.error.incorrect-usage"),
-                                                Placeholder.component("usage", Component.text("/pay <player> <amount>")));
-                                    }
-                                }
-                                else
-                                {
-                                    instance.sendMiniMessage(player, instance.getConfig().getString("messages.error.not-accepting-payments"),
-                                            Placeholder.component("target", Component.text(target.getName())));
-                                }
+                                instance.getOfflinePlayerNames().values().stream()
+                                        .filter(name -> !name.equals(senderPlayer.getName()) && name.toLowerCase(Locale.ROOT).startsWith(builder.getRemainingLowerCase()))
+                                        .forEach(builder::suggest);
                             }
                             else
                             {
-                                instance.sendMiniMessage(player, instance.getConfig().getString("messages.error.no-account-other"),
-                                        Placeholder.component("target", Component.text(target.getName())));
+                                instance.getOfflinePlayerNames().values().stream()
+                                        .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(builder.getRemainingLowerCase()))
+                                        .forEach(builder::suggest);
                             }
-                        }
-                        else
-                        {
-                            instance.sendMiniMessage(player, instance.getConfig().getString("messages.error.no-account"));
-                        }
-                    }
-                    else
-                    {
-                        instance.sendMiniMessage(sender, instance.getConfig().getString("messages.error.cannot-pay-yourself"));
-                    }
-                }
-                else
-                {
-                    instance.sendMiniMessage(sender, instance.getConfig().getString("messages.error.not-joined-before"),
-                            Placeholder.component("username", Component.text(args[0])));
-                }
-            }
-            else
-            {
-                instance.sendMiniMessage(sender, instance.getConfig().getString("messages.error.incorrect-usage"),
-                        Placeholder.component("usage", Component.text("/pay <player> <amount>")));
-            }
-        }
-        else
-        {
-            instance.sendMiniMessage(sender, instance.getConfig().getString("messages.error.console-cannot-use"));
-        }
 
-        return true;
+                            return builder.build();
+                        }))
+
+                        .executes(ctx ->
+                        {
+                            // Send the sender a message showing the command usage of this branch
+                            ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
+                                    Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
+                                    Placeholder.component("argument_usage", Component.text("<player name> <amount>"))));
+
+                            return Command.SINGLE_SUCCESS;
+                        })
+
+                        .then(Commands.argument("amount", DoubleArgumentType.doubleArg(0D))
+
+                                .executes(ctx ->
+                                {
+                                    executeCommandLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), BigDecimal.valueOf(ctx.getArgument("amount", double.class)).stripTrailingZeros());
+
+                                    return Command.SINGLE_SUCCESS;
+                                })
+                        )
+                ).build();
     }
 
-    @Override
-    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args)
+    // Method to execute the command logic
+    private static void executeCommandLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, BigDecimal amount)
     {
-        List<String> suggestions = new ArrayList<>();
-        if (args.length == 1 && sender instanceof Player)
+        final CommandSender sender = ctx.getSource().getSender();
+
+        // If the sender is not player, return, because only players can pay money
+        if (!(sender instanceof Player senderPlayer))
         {
-            for (Player player : Bukkit.getOnlinePlayers())
-            {
-                String playerName = player.getName();
-                if (playerName != null && playerName.toUpperCase().startsWith(args[0].toUpperCase()))
-                {
-                    suggestions.add(playerName);
-                }
-            }
-            suggestions.remove(sender.getName());
+            sender.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.console-cannot-use")));
+
+            return;
         }
 
-        return !suggestions.isEmpty() ? suggestions : null;
+        // If the target player is the sender, return, because players cannot pay themselves
+        if (target == sender)
+        {
+            sender.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.cannot-pay-yourself")));
+
+            return;
+        }
+
+        Economy economy = instance.getEconomy();
+
+        // If the sender does not have an account, return
+        if (!economy.hasAccount(senderPlayer))
+        {
+            senderPlayer.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.no-account")));
+
+            return;
+        }
+
+        // If the target player does not have an account, return
+        if (!economy.hasAccount(target))
+        {
+            senderPlayer.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.no-account-other"),
+                    Placeholder.component("target", Component.text(target.getName()))));
+
+            return;
+        }
+
+        // If the target player is not accepting payments, return
+        if (!instance.getPlayerAccounts().get(target.getUniqueId()).getAcceptingPayments())
+        {
+            senderPlayer.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.not-accepting-payments"),
+                    Placeholder.component("target", Component.text(target.getName()))));
+
+            return;
+        }
+
+        // Call PlayerPayPlayerEvent event
+        PlayerPayPlayerEvent playerPayPlayerEvent = new PlayerPayPlayerEvent(senderPlayer, target, amount);
+        Bukkit.getServer().getPluginManager().callEvent(playerPayPlayerEvent);
+
+        // If the event is cancelled, return
+        if (playerPayPlayerEvent.isCancelled())
+        {
+            return;
+        }
+
+        // Reassign variables in case a plugin listening for the event changed them
+        senderPlayer = playerPayPlayerEvent.getSender();
+        target = playerPayPlayerEvent.getRecipient();
+        amount = playerPayPlayerEvent.getAmount();
+
+        double amountAsDouble = amount.doubleValue(); // For passing into the Economy methods, as they only take doubles
+
+        // If the sender does not have enough money to pay the amount specified, return
+        if (!economy.has(senderPlayer, amountAsDouble))
+        {
+            senderPlayer.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.insufficient-funds"),
+                    Placeholder.component("amount", Component.text(economy.format(amountAsDouble)))));
+
+            return;
+        }
+
+        // Try to withdraw the amount from the sender
+        EconomyResponse withdrawPlayerResponse = economy.withdrawPlayer(senderPlayer, amountAsDouble);
+
+        // If the withdrawal was unsuccessful, return
+        if (!withdrawPlayerResponse.transactionSuccess())
+        {
+            String errorMessage = withdrawPlayerResponse.errorMessage;
+
+            if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorTooManyDecimalPlaces()))
+            {
+                senderPlayer.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.too-many-decimal-places-amount"),
+                        Placeholder.component("amount", Component.text(amount.toPlainString())),
+                        Placeholder.component("decimal_places", Component.text(economy.fractionalDigits()))));
+            }
+            else if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorNotGreaterThanZero()))
+            {
+                senderPlayer.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.not-greater-than-zero-amount")));
+            }
+            else if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorInsufficientFunds())) // This should never be the case, since we already checked to make sure the sender has enough money
+            {
+                senderPlayer.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.insufficient-funds"),
+                        Placeholder.component("amount", Component.text(economy.format(amountAsDouble)))));
+            }
+            else // This should also never be able to happen
+            {
+                senderPlayer.sendMessage(instance.getMiniMessage().deserialize("<red>An unknown error occurred when withdrawing money.</red>"));
+            }
+
+            return;
+        }
+
+        // Try to deposit the amount to the target
+        EconomyResponse depositPlayerResponse = economy.depositPlayer(target, amountAsDouble);
+
+        // If the deposit was unsuccessful, deposit the amount back to the sender's balance, and return
+        if (!depositPlayerResponse.transactionSuccess())
+        {
+            // Deposit the amount back into the sender's account
+            economy.depositPlayer(senderPlayer, amountAsDouble);
+
+            // Send error message - this should be the only possible error, since the other errors were ruled out due to the withdrawal being successful
+            senderPlayer.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.would-exceed-max-balance"),
+                    Placeholder.component("target", Component.text(target.getName()))));
+
+            return;
+        }
+
+        FileConfiguration config = instance.getConfig();
+        MiniMessage miniMessage = instance.getMiniMessage();
+
+        String amountFormatted = economy.format(amountAsDouble);
+
+        // Send message to the target player, if online
+        if (target instanceof Player)
+        {
+            ((Player) target).sendMessage(miniMessage.deserialize(config.getString("messages.pay.paid-target"),
+                    Placeholder.component("player", Component.text(senderPlayer.getName())),
+                    Placeholder.component("amount", Component.text(amountFormatted))));
+        }
+
+        // Send message to the command sender
+        senderPlayer.sendMessage(miniMessage.deserialize(config.getString("messages.pay.paid-sender"),
+                Placeholder.component("target", Component.text(target.getName())),
+                Placeholder.component("amount", Component.text(amountFormatted))));
     }
 
 }
