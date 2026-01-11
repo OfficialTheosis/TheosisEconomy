@@ -4,6 +4,8 @@ main: me.Short.TheosisEconomy.TheosisEconomy
 description: A simple, yet customisable and robust, Vault-based economy provider.
 api-version: '1.21.11'
 
+load: STARTUP
+
 dependencies:
   server:
     Vault:

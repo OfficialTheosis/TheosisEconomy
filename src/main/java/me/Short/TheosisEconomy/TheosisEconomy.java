@@ -198,12 +198,6 @@ public class TheosisEconomy extends JavaPlugin
 
         // Schedule task to periodically save any dirty player accounts to JSON files
         scheduledSaveTask = saveDirtyPlayerAccountsScheduler.schedule(this::runSaveDirtyPlayerAccountsLoop, getConfig().getLong("settings.player-accounts-save-frequency"), TimeUnit.SECONDS);
-
-        // REMOVE WHEN DONE
-        for (Map.Entry<UUID, PlayerAccount> playerAccount : playerAccounts.entrySet())
-        {
-            getDirtyPlayerAccountSnapshots().put(playerAccount.getKey(), playerAccount.getValue().snapshot());
-        }
     }
 
     @Override
