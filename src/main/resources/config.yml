@@ -403,8 +403,8 @@ messages:
     console-cannot-use: "<red>Only players can do that.</red>"
 
     # When a player-targetting command is run, but the target has not joined before, and they need to have in order for the command to work
-    #      - <username> will be replaced with the specified username
-    not-joined-before: "<red><gold><username></gold> has not joined before.</red>"
+    #      - <name> will be replaced with the specified name
+    not-joined-before: "<red><gold><name></gold> has not joined before.</red>"
 
     # When a player runs a command that requires them to have an account, but they don't have one
     no-account: "<red>You do not have an account.</red>"
