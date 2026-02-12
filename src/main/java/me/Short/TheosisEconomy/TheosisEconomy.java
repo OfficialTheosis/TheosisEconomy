@@ -26,10 +26,14 @@ import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -201,10 +205,24 @@ public class TheosisEconomy extends JavaPlugin
     @Override
     public void onDisable()
     {
-        // Cancel async dirty player account saving task, since we're going to save here manually
-        scheduledSaveTask.cancel(false);
+        // Shut down the save dirty player accounts scheduler, allowing the current task (if there is one running) to finish
+        saveDirtyPlayerAccountsScheduler.shutdown();
 
-        // Save dirty player accounts to JSON files
+        // Allow currently running task to finish, or force shutdown if it hasn't after 30 seconds (it should never take this long)
+        try
+        {
+            if (!saveDirtyPlayerAccountsScheduler.awaitTermination(30, TimeUnit.SECONDS))
+            {
+                saveDirtyPlayerAccountsScheduler.shutdownNow();
+            }
+        }
+        catch (InterruptedException ignored)
+        {
+            saveDirtyPlayerAccountsScheduler.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+
+        // Save dirty player accounts one last time
         saveDirtyPlayerAccounts();
     }
 
@@ -331,30 +349,49 @@ public class TheosisEconomy extends JavaPlugin
     // Method to save all player accounts in `dirtyPlayerAccountSnapshots` to respective JSON files, and remove the saved accounts from `dirtyPlayerAccountSnapshots` after
     private void saveDirtyPlayerAccounts()
     {
-        if (!dirtyPlayerAccountSnapshots.isEmpty())
+        // If there are no dirty player account snapshots, return
+        if (dirtyPlayerAccountSnapshots.isEmpty())
         {
-            // Snapshot of `dirtyPlayerAccountSnapshots`
-            Map<UUID, PlayerAccountSnapshot> dirtyPlayerAccountSnapshotsSnapshot = new HashMap<>(dirtyPlayerAccountSnapshots);
+            return;
+        }
 
-            // Save each dirty player account to a JSON file inside the "player-accounts" folder
-            for (Map.Entry<UUID, PlayerAccountSnapshot> entry : dirtyPlayerAccountSnapshotsSnapshot.entrySet())
+        // Save each dirty player account to a JSON file inside the "player-accounts" folder
+        for (Map.Entry<UUID, PlayerAccountSnapshot> entry : new HashMap<>(dirtyPlayerAccountSnapshots).entrySet())
+        {
+            UUID uuid = entry.getKey();
+            PlayerAccountSnapshot playerAccountSnapshot = entry.getValue();
+
+            Path target = getDataFolder().toPath()
+                    .resolve("player-accounts")
+                    .resolve(uuid + ".json");
+
+            Path temp = target.resolveSibling(target.getFileName() + ".tmp");
+
+            try
             {
-                String fileName = getDataFolder().getAbsolutePath() + File.separator + "player-accounts" + File.separator + entry.getKey() + ".json";
-
-                try (Writer writer = new FileWriter(fileName))
+                // Write the snapshot to a temporary file
+                try (Writer writer = Files.newBufferedWriter(temp, StandardCharsets.UTF_8))
                 {
-                    // Write the `PlayerAccountSnapshot` to a JSON file with the name `fileName`
-                    gson.toJson(entry.getValue(), writer);
-                }
-                catch (IOException exception)
-                {
-                    getLogger().log(Level.WARNING, "Failed to save player account to file: " + fileName);
-                    exception.printStackTrace();
-                    continue;
+                    gson.toJson(playerAccountSnapshot, writer);
                 }
 
-                // Remove the entry from `dirtyPlayerAccountSnapshots`, since the player's account has now been saved
-                dirtyPlayerAccountSnapshots.remove(entry.getKey());
+                // Atomically move the temporary file to the real JSON file
+                try
+                {
+                    Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                }
+                catch (AtomicMoveNotSupportedException ignored)
+                {
+                    Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+
+                // Remove the snapshot from `dirtyPlayerAccountSnapshots` - only remove if same instance
+                dirtyPlayerAccountSnapshots.remove(uuid, playerAccountSnapshot);
+            }
+            catch (IOException exception)
+            {
+                getLogger().log(Level.WARNING, "Failed to save player account to file: " + target);
+                exception.printStackTrace();
             }
         }
     }
