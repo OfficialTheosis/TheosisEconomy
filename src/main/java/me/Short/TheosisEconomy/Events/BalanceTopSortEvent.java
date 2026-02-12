@@ -14,7 +14,7 @@ public class BalanceTopSortEvent extends Event implements Cancellable
 
     private boolean cancelled;
 
-    // Set of UUIDs of players who will be excluded from baltop
+    // Set of UUIDs of players who will be excluded from the top balances map
     private Set<UUID> excludedPlayers;
 
     public BalanceTopSortEvent(Set<UUID> excludedPlayers)

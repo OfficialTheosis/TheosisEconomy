@@ -47,7 +47,7 @@ settings:
     rounding-mode: NONE
 
   # Settings related to the "/balancetop" command
-  baltop:
+  balancetop:
 
     # How often you want the top balances to be updated, in ticks (20 ticks = 1 second, 300 ticks = 15 seconds)
     # Default: 300
@@ -117,22 +117,22 @@ settings:
   placeholders:
 
     # What the %theosiseconomy_richest_<position>_name% placeholder will be replaced with if there is no player in the specified position on "/balancetop"
-    baltop-position-name-none: "N/A"
+    balancetop-position-name-none: "N/A"
 
     # What the %theosiseconomy_richest_<position>_uuid% placeholder will be replaced with if there is no player in the specified position on "/balancetop"
-    baltop-position-uuid-none: "N/A"
+    balancetop-position-uuid-none: "N/A"
 
     # What the %theosiseconomy_richest_<position>_balance% placeholder will be replaced with if there is no player in the specified position on "/balancetop"
-    baltop-position-balance-none: "N/A"
+    balancetop-position-balance-none: "N/A"
 
     # What the %theosiseconomy_richest_<position>_balance_formatted% placeholder will be replaced with if there is no player in the specified position on "/balancetop"
-    baltop-position-balance_formatted-none: "N/A"
+    balancetop-position-balance_formatted-none: "N/A"
 
     # What the %theosiseconomy_richest_<position>_entry% placeholder will be replaced with if there is no player in the specified position on "/balancetop"
-    baltop-position-entry-none: "N/A"
+    balancetop-position-entry-none: "N/A"
 
     # What the %theosiseconomy_richest_<position>_entry_legacy% placeholder will be replaced with if there is no player in the specified position on "/balancetop"
-    baltop-position-entry-legacy-none: "N/A"
+    balancetop-position-entry-legacy-none: "N/A"
 
   # Settings related to the logging of important things that TheosisEconomy does
   #      - Log messages do not support colour codes; they should just be plain strings
@@ -342,7 +342,7 @@ messages:
     their-balance: "<dark_aqua><gold><target></gold> has <gold><balance></gold>.</dark_aqua>"
 
   # Messages related to the "/balancetop" command
-  baltop:
+  balancetop:
 
     # The header
     #      - <page> will be replaced with the current page
@@ -426,7 +426,7 @@ messages:
 
     # When the "/balancetop" command is used, but there are no entries
     #      - <total> will be replaced with the total balance of the server
-    no-baltop-entries: |-
+    no-balancetop-entries: |-
       <aqua>Total:</aqua> <light_purple><total></light_purple>
       <red>There are no balances to show.</red>
 

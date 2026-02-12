@@ -26,6 +26,7 @@ import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitScheduler;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.io.FileReader;
@@ -83,17 +84,14 @@ public class TheosisEconomy extends JavaPlugin
     // Cache of all player accounts
     private Map<UUID, PlayerAccount> playerAccounts;
 
-    // Baltop
-    private Map<UUID, BigDecimal> baltop;
+    // Top balances and combined total balance
+    private BalanceTop balanceTop;
 
-    // Combined total of all players' balances - updated in "updateBaltop"
-    private BigDecimal combinedTotalBalance;
+    // The top balances update task, so it can be cancelled in the event of a reload
+    private BukkitTask updateBalanceTopTask;
 
-    // ID for the baltop update task, so it can be cancelled in the event of a reload
-    private int updateBaltopTaskId;
-
-    // Flag to determine whether a baltop update task is running - used to prevent tasks from being able to overlap
-    private AtomicBoolean updateBaltopTaskRunning;
+    // Flag to determine whether a top balances update task is running - used to prevent tasks from being able to overlap
+    private AtomicBoolean updateBalanceTopTaskRunning;
 
     // Instance of the MiniMessage API
     private MiniMessage miniMessage;
@@ -101,13 +99,13 @@ public class TheosisEconomy extends JavaPlugin
     // Instance of the LegacyComponentSerializer API
     private LegacyComponentSerializer legacyComponentSerializer;
 
-    // Whether LiteBans is installed - for checking in the "updateBaltop" method
+    // Whether LiteBans is installed - for checking in the "updateBalanceTop" method
     private boolean liteBansInstalled;
 
-    // Config options that may need to be retrieved in the "updateBaltop" method later
-    private boolean baltopConsiderExcludePermission;
-    private boolean baltopExcludeBannedPlayers;
-    private BigDecimal baltopMinBalance;
+    // Config options that may need to be retrieved in the "updateBalanceTop" method later
+    private boolean balanceTopConsiderExcludePermission;
+    private boolean balanceTopExcludeBannedPlayers;
+    private BigDecimal balanceTopMinBalance;
 
     @Override
     public void onEnable()
@@ -143,11 +141,8 @@ public class TheosisEconomy extends JavaPlugin
         // Hook into Vault Permissions
         permissions = getServer().getServicesManager().getRegistration(Permission.class).getProvider();
 
-        // Set initial "baltop" value to an empty linked hashmap
-        baltop = new LinkedHashMap<>();
-
-        // Set initial "combinedTotalBalance" to 0
-        combinedTotalBalance = BigDecimal.ZERO;
+        // Initial empty BalanceTop data
+        balanceTop = new BalanceTop(new LinkedHashMap<>(), BigDecimal.ZERO);
 
         // Get instance of the MiniMessage API
         miniMessage = MiniMessage.miniMessage();
@@ -155,10 +150,10 @@ public class TheosisEconomy extends JavaPlugin
         // Get instance of the LegacyComponentSerializer API
         legacyComponentSerializer = LegacyComponentSerializer.legacySection();
 
-        // Get config options from config.yml here, so they don't need to be retrieved in the async "updateBaltop" method later
-        baltopConsiderExcludePermission = getConfig().getBoolean("settings.baltop.consider-exclude-permission");
-        baltopExcludeBannedPlayers = getConfig().getBoolean("settings.baltop.exclude-banned-players");
-        baltopMinBalance = new BigDecimal(getConfig().getString("settings.baltop.min-balance"));
+        // Get config options from config.yml here, so they don't need to be retrieved in the async "updateBalanceTop" method later
+        balanceTopConsiderExcludePermission = getConfig().getBoolean("settings.balancetop.consider-exclude-permission");
+        balanceTopExcludeBannedPlayers = getConfig().getBoolean("settings.balancetop.exclude-banned-players");
+        balanceTopMinBalance = new BigDecimal(getConfig().getString("settings.balancetop.min-balance"));
 
         // Register events
         PluginManager pluginManager = getServer().getPluginManager();
@@ -197,11 +192,11 @@ public class TheosisEconomy extends JavaPlugin
         // Cache all players' UUIDs and their account data
         playerAccounts = cachePlayerAccounts();
 
-        // Set "updateBaltopTaskRunning"
-        updateBaltopTaskRunning = new AtomicBoolean(false);
+        // Set "updateBalanceTopTaskRunning"
+        updateBalanceTopTaskRunning = new AtomicBoolean(false);
 
-        // Schedule repeating baltop update task
-        scheduleBaltopUpdateTask();
+        // Schedule repeating BalanceTop update task
+        scheduleBalanceTopUpdateTask();
 
         // Schedule task to periodically save any dirty player accounts to JSON files
         scheduledSaveTask = saveDirtyPlayerAccountsScheduler.schedule(this::runSaveDirtyPlayerAccountsLoop, getConfig().getLong("settings.player-accounts-save-frequency"), TimeUnit.SECONDS);
@@ -248,7 +243,7 @@ public class TheosisEconomy extends JavaPlugin
         return offlinePlayerNames;
     }
 
-    // Method to cache all player accounts from their respective JSON files in the "player-accounts" folder - also migrates any files in the old "data.yml" file if it exists
+    // Method to cache all player accounts from their respective JSON files in the "player-accounts" folder
     private Map<UUID, PlayerAccount> cachePlayerAccounts()
     {
         Map<UUID, PlayerAccount> playerAccounts = new HashMap<>();
@@ -259,40 +254,6 @@ public class TheosisEconomy extends JavaPlugin
         if (!playerAccountsFolder.exists())
         {
             playerAccountsFolder.mkdirs();
-        }
-
-        // If there is an old "data.yml" file, migrate all player accounts to separate JSON files
-        File dataFile = new File(getDataFolder(), "data.yml");
-        if (dataFile.exists())
-        {
-            getLogger().log(Level.INFO, "Old \"data.yml\" file found. Migrating player data to JSON files...");
-
-            ConfigurationSection data = YamlConfiguration.loadConfiguration(dataFile).getConfigurationSection("players");
-
-            // If there is data, create a `PlayerAccountSnapshot` based on it, add it to `dirtyPlayerAccountSnapshots`, then save the dirty player accounts to respective JSON files
-            if (data != null)
-            {
-                // Add snapshots to `dirtyPlayerAccountSnapshots`
-                for (String uuid : data.getKeys(false))
-                {
-                    dirtyPlayerAccountSnapshots.put(UUID.fromString(uuid), new PlayerAccountSnapshot(new BigDecimal(data.getString(uuid + ".balance")), data.getBoolean(uuid + ".acceptingPayments")));
-                }
-
-                // Save
-                saveDirtyPlayerAccounts();
-            }
-
-            // Delete the "data.yml" file
-            if (dataFile.delete())
-            {
-                getLogger().log(Level.INFO, "The old \"data.yml\" file has been deleted.");
-            }
-            else
-            {
-                getLogger().log(Level.INFO, "Failed to delete the old \"data.yml\" file.");
-            }
-
-            getLogger().log(Level.INFO, "Migration complete.");
         }
 
         // Get a list of player account files
@@ -331,14 +292,13 @@ public class TheosisEconomy extends JavaPlugin
         return playerAccounts;
     }
 
-    // Method to schedule the repeating baltop update task
-    private void scheduleBaltopUpdateTask()
+    // Method to schedule a repeating BalanceTop update task
+    private void scheduleBalanceTopUpdateTask()
     {
-        // Call "updateBaltop" on a schedule (frequency defined in config.yml) and set "baltop" and "combinedTotalBalance" to its results
-        updateBaltopTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(this, () ->
+        updateBalanceTopTask = Bukkit.getScheduler().runTaskTimer(this, () ->
         {
-            // Don't update baltop if a task is already running
-            if (updateBaltopTaskRunning.compareAndSet(false, true))
+            // Don't update BalanceTop if a task is already running
+            if (updateBalanceTopTaskRunning.compareAndSet(false, true))
             {
                 return;
             }
@@ -355,15 +315,14 @@ public class TheosisEconomy extends JavaPlugin
                 return;
             }
 
-            // Call "updateBaltop", passing in the HashSet of excluded players' UUIDs
-            updateBaltop(balanceTopSortEvent.getExcludedPlayers()).thenAccept(pair ->
+            // Call "updateBalanceTop", passing in the HashSet of excluded players' UUIDs
+            updateBalanceTop(balanceTopSortEvent.getExcludedPlayers()).thenAccept(balanceTop ->
             {
-                baltop = pair.getLeft();
-                combinedTotalBalance = pair.getRight();
+                this.balanceTop = balanceTop;
 
-                updateBaltopTaskRunning.set(false);
+                updateBalanceTopTaskRunning.set(false);
             });
-        }, 0L, getConfig().getLong("settings.baltop.update-task-frequency"));
+        }, 0L, getConfig().getLong("settings.balancetop.update-task-frequency"));
     }
 
     // Method to repeatedly call `saveDirtyPlayerAccounts()` async
@@ -404,12 +363,12 @@ public class TheosisEconomy extends JavaPlugin
         }
     }
 
-    // Method to update baltop async
-    private CompletableFuture<Pair<Map<UUID, BigDecimal>, BigDecimal>> updateBaltop(Set<UUID> excludedPlayers)
+    // Method to update BalanceTop async
+    private CompletableFuture<BalanceTop> updateBalanceTop(Set<UUID> excludedPlayers)
     {
         return CompletableFuture.supplyAsync(() ->
         {
-            Map<UUID, BigDecimal> unsortedBaltop = new HashMap<>();
+            Map<UUID, BigDecimal> unsortedBalances = new HashMap<>();
             BigDecimal total = BigDecimal.ZERO;
 
             // Get player names and their balances in no particular order, excluding banned players if config.yml says to not include them - the `Bukkit.getOfflinePlayer(uuid).isBanned()` is the only thing here that might not be safe to run async, but no issues so far in testing
@@ -417,42 +376,40 @@ public class TheosisEconomy extends JavaPlugin
             {
                 OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
 
-                if (!excludedPlayers.contains(uuid) && !(baltopConsiderExcludePermission && permissions.playerHas(null, player, "theosiseconomy.balancetop.exclude")) && (!baltopExcludeBannedPlayers || !((liteBansInstalled && Database.get().isPlayerBanned(uuid, null)) || player.isBanned())))
+                if (!excludedPlayers.contains(uuid) && !(balanceTopConsiderExcludePermission && permissions.playerHas(null, player, "theosiseconomy.balancetop.exclude")) && (!balanceTopExcludeBannedPlayers || !((liteBansInstalled && Database.get().isPlayerBanned(uuid, null)) || player.isBanned())))
                 {
                     PlayerAccount account = playerAccounts.get(uuid);
                     BigDecimal balance = account.getBalance();
 
                     total = total.add(balance);
 
-                    if (balance.compareTo(baltopMinBalance) >= 0)
+                    if (balance.compareTo(balanceTopMinBalance) >= 0)
                     {
-                        unsortedBaltop.put(uuid, balance);
+                        unsortedBalances.put(uuid, balance);
                     }
                 }
             }
 
-            // Create and return sorted version of "unsortedBaltop"
-            LinkedHashMap<UUID, BigDecimal> sortedBaltop = new LinkedHashMap<>();
-            unsortedBaltop.entrySet().stream()
+            // Create and return sorted version of "unsortedBalances"
+            LinkedHashMap<UUID, BigDecimal> topBalances = new LinkedHashMap<>();
+            unsortedBalances.entrySet().stream()
                     .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
-                    .forEach(entry -> sortedBaltop.put(entry.getKey(), entry.getValue()));
+                    .forEach(entry -> topBalances.put(entry.getKey(), entry.getValue()));
 
-            return Pair.of(sortedBaltop, total);
+            return new BalanceTop(topBalances, total);
         });
     }
 
     // Method to reload the config and data files
     public void reload()
     {
-        BukkitScheduler scheduler = Bukkit.getScheduler();
-
         // Reload config.yml from disk
         reloadConfig();
 
         // Re-get values from config that were retrieved in "onEnable"
-        baltopConsiderExcludePermission = getConfig().getBoolean("settings.baltop.consider-exclude-permission");
-        baltopExcludeBannedPlayers = getConfig().getBoolean("settings.baltop.exclude-banned-players");
-        baltopMinBalance = new BigDecimal(getConfig().getString("settings.baltop.min-balance"));
+        balanceTopConsiderExcludePermission = getConfig().getBoolean("settings.balancetop.consider-exclude-permission");
+        balanceTopExcludeBannedPlayers = getConfig().getBoolean("settings.balancetop.exclude-banned-players");
+        balanceTopMinBalance = new BigDecimal(getConfig().getString("settings.balancetop.min-balance"));
 
         // Set whether to send logs to console
         Logger logger = getLogger();
@@ -514,14 +471,14 @@ public class TheosisEconomy extends JavaPlugin
         // Re-cache player accounts
         playerAccounts = cachePlayerAccounts();
 
-        // Cancel the current repeating baltop update task
-        scheduler.cancelTask(updateBaltopTaskId);
+        // Cancel the current repeating BalanceTop update task
+        updateBalanceTopTask.cancel();
 
-        // Re-set "updateBaltopTaskRunning"
-        updateBaltopTaskRunning.set(false);
+        // Re-set "updateBalanceTopTaskRunning"
+        updateBalanceTopTaskRunning.set(false);
 
-        // Re-schedule repeating baltop update task
-        scheduleBaltopUpdateTask();
+        // Re-schedule repeating BalanceTop update task
+        scheduleBalanceTopUpdateTask();
     }
 
     // ----- Getters -----
@@ -550,16 +507,10 @@ public class TheosisEconomy extends JavaPlugin
         return playerAccounts;
     }
 
-    // Getter for "baltop"
-    public Map<UUID, BigDecimal> getBaltop()
+    // Getter for "balanceTop"
+    public BalanceTop getBalanceTop()
     {
-        return baltop;
-    }
-
-    // Getter for "combinedTotalBalance"
-    public BigDecimal getCombinedTotalBalance()
-    {
-        return combinedTotalBalance;
+        return balanceTop;
     }
 
     // Getter for "miniMessage"

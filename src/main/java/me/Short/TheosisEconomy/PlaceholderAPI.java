@@ -62,13 +62,13 @@ public class PlaceholderAPI extends PlaceholderExpansion
         // %theosiseconomy_combined_total_balance%
         if (params.equalsIgnoreCase("combined_total_balance"))
         {
-            return instance.getCombinedTotalBalance().toPlainString();
+            return instance.getBalanceTop().getCombinedTotalBalance().toPlainString();
         }
 
         // %theosiseconomy_combined_total_balance_formatted%
         if (params.equalsIgnoreCase("combined_total_balance_formatted"))
         {
-            return instance.getCombinedTotalBalance().toPlainString();
+            return instance.getEconomy().format(instance.getBalanceTop().getCombinedTotalBalance().doubleValue());
         }
 
         // %theosiseconomy_richest_<position>_name%
@@ -78,14 +78,14 @@ public class PlaceholderAPI extends PlaceholderExpansion
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_name", ""));
 
-                List<Map.Entry<UUID, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
+                List<Map.Entry<UUID, BigDecimal>> topBalancesEntries = new ArrayList<>(instance.getBalanceTop().getTopBalances().entrySet());
 
-                if (position <= baltopEntries.size())
+                if (position <= topBalancesEntries.size())
                 {
-                    return instance.getOfflinePlayerNames().get(baltopEntries.get(position - 1).getKey());
+                    return instance.getOfflinePlayerNames().get(topBalancesEntries.get(position - 1).getKey());
                 }
 
-                return instance.getConfig().getString("settings.placeholders.baltop-position-name-none");
+                return instance.getConfig().getString("settings.placeholders.balancetop-position-name-none");
             }
             catch (NumberFormatException exception)
             {
@@ -100,14 +100,14 @@ public class PlaceholderAPI extends PlaceholderExpansion
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_uuid", ""));
 
-                List<Map.Entry<UUID, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
+                List<Map.Entry<UUID, BigDecimal>> topBalancesEntries = new ArrayList<>(instance.getBalanceTop().getTopBalances().entrySet());
 
-                if (position <= baltopEntries.size())
+                if (position <= topBalancesEntries.size())
                 {
-                    return baltopEntries.get(position - 1).getKey().toString();
+                    return topBalancesEntries.get(position - 1).getKey().toString();
                 }
 
-                return instance.getConfig().getString("settings.placeholders.baltop-position-uuid-none");
+                return instance.getConfig().getString("settings.placeholders.balancetop-position-uuid-none");
             }
             catch (NumberFormatException exception)
             {
@@ -122,14 +122,14 @@ public class PlaceholderAPI extends PlaceholderExpansion
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_balance", ""));
 
-                List<Map.Entry<UUID, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
+                List<Map.Entry<UUID, BigDecimal>> topBalancesEntries = new ArrayList<>(instance.getBalanceTop().getTopBalances().entrySet());
 
-                if (position <= baltopEntries.size())
+                if (position <= topBalancesEntries.size())
                 {
-                    return baltopEntries.get(position - 1).getValue().toPlainString();
+                    return topBalancesEntries.get(position - 1).getValue().toPlainString();
                 }
 
-                return instance.getConfig().getString("settings.placeholders.baltop-position-balance-none");
+                return instance.getConfig().getString("settings.placeholders.balancetop-position-balance-none");
             }
             catch (NumberFormatException exception)
             {
@@ -144,14 +144,14 @@ public class PlaceholderAPI extends PlaceholderExpansion
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_balance_formatted", ""));
 
-                List<Map.Entry<UUID, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
+                List<Map.Entry<UUID, BigDecimal>> topBalancesEntries = new ArrayList<>(instance.getBalanceTop().getTopBalances().entrySet());
 
-                if (position <= baltopEntries.size())
+                if (position <= topBalancesEntries.size())
                 {
-                    return instance.getEconomy().format(baltopEntries.get(position - 1).getValue().doubleValue());
+                    return instance.getEconomy().format(topBalancesEntries.get(position - 1).getValue().doubleValue());
                 }
 
-                return instance.getConfig().getString("settings.placeholders.baltop-position-balance_formatted-none");
+                return instance.getConfig().getString("settings.placeholders.balancetop-position-balance_formatted-none");
             }
             catch (NumberFormatException exception)
             {
@@ -166,23 +166,23 @@ public class PlaceholderAPI extends PlaceholderExpansion
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_entry", ""));
 
-                List<Map.Entry<UUID, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
+                List<Map.Entry<UUID, BigDecimal>> topBalancesEntries = new ArrayList<>(instance.getBalanceTop().getTopBalances().entrySet());
 
-                if (position <= baltopEntries.size())
+                if (position <= topBalancesEntries.size())
                 {
-                    Map.Entry<UUID, BigDecimal> baltopEntry = baltopEntries.get(position - 1);
-                    OfflinePlayer entryPlayer = Bukkit.getOfflinePlayer(baltopEntry.getKey());
+                    Map.Entry<UUID, BigDecimal> topBalancesEntry = topBalancesEntries.get(position - 1);
+                    OfflinePlayer entryPlayer = Bukkit.getOfflinePlayer(topBalancesEntry.getKey());
 
-                    String entry = instance.getConfig().getString(player == entryPlayer ? "messages.baltop.entry-you" : "messages.baltop.entry")
+                    String entry = instance.getConfig().getString(player == entryPlayer ? "messages.balancetop.entry-you" : "messages.balancetop.entry")
                             .replace("<position>", Integer.toString(position))
                             .replace("<player>", entryPlayer.getName())
-                            .replace("<balance>", instance.getEconomy().format(baltopEntry.getValue().doubleValue()));
+                            .replace("<balance>", instance.getEconomy().format(topBalancesEntry.getValue().doubleValue()));
 
                     return entry
                             .replace("<dots>", new String(new char[Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(instance.getMiniMessage().deserialize(entry)), true)]).replace("\0", "."));
                 }
 
-                return instance.getConfig().getString("settings.placeholders.baltop-position-entry-none");
+                return instance.getConfig().getString("settings.placeholders.balancetop-position-entry-none");
             }
             catch (NumberFormatException exception)
             {
@@ -197,23 +197,23 @@ public class PlaceholderAPI extends PlaceholderExpansion
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_entry_legacy", ""));
 
-                List<Map.Entry<UUID, BigDecimal>> baltopEntries = new ArrayList<>(instance.getBaltop().entrySet());
+                List<Map.Entry<UUID, BigDecimal>> topBalancesEntries = new ArrayList<>(instance.getBalanceTop().getTopBalances().entrySet());
 
-                if (position <= baltopEntries.size())
+                if (position <= topBalancesEntries.size())
                 {
-                    Map.Entry<UUID, BigDecimal> baltopEntry = baltopEntries.get(position - 1);
-                    OfflinePlayer entryPlayer = Bukkit.getOfflinePlayer(baltopEntry.getKey());
+                    Map.Entry<UUID, BigDecimal> topBalancesEntry = topBalancesEntries.get(position - 1);
+                    OfflinePlayer entryPlayer = Bukkit.getOfflinePlayer(topBalancesEntry.getKey());
 
-                    String entry = instance.getConfig().getString(player == entryPlayer ? "messages.baltop.entry-you" : "messages.baltop.entry")
+                    String entry = instance.getConfig().getString(player == entryPlayer ? "messages.balancetop.entry-you" : "messages.balancetop.entry")
                             .replace("<position>", Integer.toString(position))
                             .replace("<player>", entryPlayer.getName())
-                            .replace("<balance>", instance.getEconomy().format(baltopEntry.getValue().doubleValue()));
+                            .replace("<balance>", instance.getEconomy().format(topBalancesEntry.getValue().doubleValue()));
 
                     return instance.getLegacyComponentSerializer().serialize(instance.getMiniMessage().deserialize(entry
                             .replace("<dots>", new String(new char[Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(instance.getMiniMessage().deserialize(entry)), true)]).replace("\0", "."))));
                 }
 
-                return instance.getConfig().getString("settings.placeholders.baltop-position-entry-legacy-none");
+                return instance.getConfig().getString("settings.placeholders.balancetop-position-entry-legacy-none");
             }
             catch (NumberFormatException exception)
             {

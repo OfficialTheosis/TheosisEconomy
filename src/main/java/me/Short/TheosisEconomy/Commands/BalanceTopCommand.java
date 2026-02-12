@@ -6,6 +6,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+import me.Short.TheosisEconomy.BalanceTop;
 import me.Short.TheosisEconomy.TheosisEconomy;
 import me.Short.TheosisEconomy.Util;
 import net.kyori.adventure.text.Component;
@@ -53,7 +54,7 @@ public class BalanceTopCommand
                         // Send all valid page numbers as suggestions
                         .suggests((ctx, builder) -> CompletableFuture.supplyAsync(() ->
                         {
-                            for (int i = 1; i <= calculateBaltopPages(instance); i++)
+                            for (int i = 1; i <= calculateBalanceTopPages(instance); i++)
                             {
                                 if (Integer.toString(i).startsWith(builder.getRemaining()))
                                 {
@@ -85,19 +86,20 @@ public class BalanceTopCommand
 
         Economy economy = instance.getEconomy();
 
-        Map<UUID, BigDecimal> baltop = instance.getBaltop();
+        BalanceTop balanceTop = instance.getBalanceTop();
+        Map<UUID, BigDecimal> topBalances = balanceTop.getTopBalances();
 
-        // If the baltop is empty, tell the command sender, and return
-        if (baltop.isEmpty())
+        // If the top balances map is empty, tell the command sender, and return
+        if (topBalances.isEmpty())
         {
-            sender.sendMessage(miniMessage.deserialize(config.getString("messages.error.no-baltop-entries"),
-                    Placeholder.component("total", Component.text(economy.format(instance.getCombinedTotalBalance().doubleValue())))));
+            sender.sendMessage(miniMessage.deserialize(config.getString("messages.error.no-balancetop-entries"),
+                    Placeholder.component("total", Component.text(economy.format(balanceTop.getCombinedTotalBalance().doubleValue())))));
 
             return;
         }
 
-        int pageLength = config.getInt("settings.baltop.page-length");
-        int pages = calculateBaltopPages(instance);
+        int pageLength = config.getInt("settings.balancetop.page-length");
+        int pages = calculateBalanceTopPages(instance);
 
         // Make sure the specified page isn't below 1, and doesn't exceed the number of pages
         if (pageNumber < 1)
@@ -110,37 +112,37 @@ public class BalanceTopCommand
         }
 
         // Initial output (header)
-        Component output = miniMessage.deserialize(config.getString("messages.baltop.header"),
+        Component output = miniMessage.deserialize(config.getString("messages.balancetop.header"),
                 Placeholder.component("page", Component.text(pageNumber)),
                 Placeholder.component("pages", Component.text(pages)),
-                Placeholder.component("total", Component.text(economy.format(instance.getCombinedTotalBalance().doubleValue()))));
+                Placeholder.component("total", Component.text(economy.format(balanceTop.getCombinedTotalBalance().doubleValue()))));
 
         int startPoint = (pageNumber - 1) * pageLength;
 
         // Append entries to the output
-        List<Map.Entry<UUID, BigDecimal>> entries = new ArrayList<>(baltop.entrySet());
+        List<Map.Entry<UUID, BigDecimal>> entries = new ArrayList<>(topBalances.entrySet());
         for (int i = startPoint; i < startPoint + pageLength && i < entries.size(); i++)
         {
             Map.Entry<UUID, BigDecimal> entry = entries.get(i);
 
             OfflinePlayer player = Bukkit.getOfflinePlayer(entry.getKey());
 
-            String baltopEntry = config.getString(player == sender ? "messages.baltop.entry-you" : "messages.baltop.entry");
+            String balanceTopEntry = config.getString(player == sender ? "messages.balancetop.entry-you" : "messages.balancetop.entry");
 
-            if (baltopEntry.contains("<dots>"))
+            if (balanceTopEntry.contains("<dots>"))
             {
-                output = output.appendNewline().append(miniMessage.deserialize(baltopEntry,
+                output = output.appendNewline().append(miniMessage.deserialize(balanceTopEntry,
                         Placeholder.component("position", Component.text(i + 1)),
                         Placeholder.component("player", Component.text(player.getName())),
                         Placeholder.component("balance", Component.text(economy.format(entry.getValue().doubleValue()))),
-                        Placeholder.component("dots", Component.text(new String(new char[Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(miniMessage.deserialize(baltopEntry,
+                        Placeholder.component("dots", Component.text(new String(new char[Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(miniMessage.deserialize(balanceTopEntry,
                                 Placeholder.component("position", Component.text(i + 1)),
                                 Placeholder.component("player", Component.text(player.getName())),
                                 Placeholder.component("balance", Component.text(economy.format(entry.getValue().doubleValue()))))), sender instanceof Player)]).replace("\0", ".")))));
             }
             else
             {
-                output = output.appendNewline().append(miniMessage.deserialize(baltopEntry,
+                output = output.appendNewline().append(miniMessage.deserialize(balanceTopEntry,
                         Placeholder.component("position", Component.text(i + 1)),
                         Placeholder.component("player", Component.text(player.getName())),
                         Placeholder.component("balance", Component.text(economy.format(entry.getValue().doubleValue())))));
@@ -151,10 +153,10 @@ public class BalanceTopCommand
         sender.sendMessage(output);
     }
 
-    // Method to calculate the number of pages in the baltop
-    private static int calculateBaltopPages(TheosisEconomy instance)
+    // Method to calculate the number of pages for the top balances map
+    private static int calculateBalanceTopPages(TheosisEconomy instance)
     {
-        return (int) Math.ceil((double) instance.getBaltop().size() / (double) instance.getConfig().getInt("settings.baltop.page-length"));
+        return (int) Math.ceil((double) instance.getBalanceTop().getTopBalances().size() / (double) instance.getConfig().getInt("settings.balancetop.page-length"));
     }
 
 }
