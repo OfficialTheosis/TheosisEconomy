@@ -46,7 +46,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.FileHandler;
@@ -62,9 +61,6 @@ public class TheosisEconomy extends JavaPlugin
 
     // Scheduler for handling the repeated saving of dirty player accounts
     private ScheduledExecutorService saveDirtyPlayerAccountsScheduler;
-
-    // Instance of the current save task scheduled to run in the future
-    private ScheduledFuture<?> scheduledSaveTask;
 
     // File handler for the plugin's logger
     private FileHandler logFileHandler;
@@ -199,7 +195,7 @@ public class TheosisEconomy extends JavaPlugin
         scheduleBalanceTopUpdateTask();
 
         // Schedule task to periodically save any dirty player accounts to JSON files
-        scheduledSaveTask = saveDirtyPlayerAccountsScheduler.schedule(this::runSaveDirtyPlayerAccountsLoop, getConfig().getLong("settings.player-accounts-save-frequency"), TimeUnit.SECONDS);
+        runSaveDirtyPlayerAccountsLoop();
     }
 
     @Override
@@ -222,7 +218,7 @@ public class TheosisEconomy extends JavaPlugin
             Thread.currentThread().interrupt();
         }
 
-        // Save dirty player accounts one last time
+        // Ensure any remaining dirty player accounts are saved
         saveDirtyPlayerAccounts();
     }
 
@@ -342,8 +338,7 @@ public class TheosisEconomy extends JavaPlugin
     // Method to repeatedly call `saveDirtyPlayerAccounts()` async
     private void runSaveDirtyPlayerAccountsLoop()
     {
-        CompletableFuture.runAsync(this::saveDirtyPlayerAccounts)
-                .thenRunAsync(() -> scheduledSaveTask = saveDirtyPlayerAccountsScheduler.schedule(this::runSaveDirtyPlayerAccountsLoop, getConfig().getLong("settings.misc.data-file-save-frequency"), TimeUnit.SECONDS), saveDirtyPlayerAccountsScheduler);
+        saveDirtyPlayerAccountsScheduler.scheduleWithFixedDelay(this::saveDirtyPlayerAccounts, 0, getConfig().getLong("settings.misc.data-file-save-frequency"), TimeUnit.SECONDS);
     }
 
     // Method to save all player accounts in `dirtyPlayerAccountSnapshots` to respective JSON files, and remove the saved accounts from `dirtyPlayerAccountSnapshots` after
@@ -492,14 +487,31 @@ public class TheosisEconomy extends JavaPlugin
             }
         }
 
-        // Cancel async dirty player account saving task
-        scheduledSaveTask.cancel(false);
+        // Shut down the save dirty player accounts scheduler, allowing the current task (if there is one running) to finish
+        saveDirtyPlayerAccountsScheduler.shutdown();
 
-        // Save dirty player accounts to JSON files
+        // Allow currently running task to finish, or force shutdown if it hasn't after 30 seconds (it should never take this long)
+        try
+        {
+            if (!saveDirtyPlayerAccountsScheduler.awaitTermination(30, TimeUnit.SECONDS))
+            {
+                saveDirtyPlayerAccountsScheduler.shutdownNow();
+            }
+        }
+        catch (InterruptedException ignored)
+        {
+            saveDirtyPlayerAccountsScheduler.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+
+        // Ensure any remaining dirty player accounts are saved
         saveDirtyPlayerAccounts();
 
+        // Re-set "saveDirtyPlayerAccountsScheduler"
+        saveDirtyPlayerAccountsScheduler = Executors.newSingleThreadScheduledExecutor();
+
         // Re-schedule repeating data save task
-        scheduledSaveTask = saveDirtyPlayerAccountsScheduler.schedule(this::runSaveDirtyPlayerAccountsLoop, getConfig().getLong("settings.player-accounts-save-frequency"), TimeUnit.SECONDS);
+        runSaveDirtyPlayerAccountsLoop();
 
         // Re-cache player accounts
         playerAccounts = cachePlayerAccounts();
