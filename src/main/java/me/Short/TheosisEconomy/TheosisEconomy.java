@@ -47,6 +47,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.FileHandler;
 import java.util.logging.Handler;
 import java.util.logging.Level;
@@ -90,6 +91,9 @@ public class TheosisEconomy extends JavaPlugin
 
     // ID for the baltop update task, so it can be cancelled in the event of a reload
     private int updateBaltopTaskId;
+
+    // Flag to determine whether a baltop update task is running - used to prevent tasks from being able to overlap
+    private AtomicBoolean updateBaltopTaskRunning;
 
     // Instance of the MiniMessage API
     private MiniMessage miniMessage;
@@ -192,6 +196,9 @@ public class TheosisEconomy extends JavaPlugin
 
         // Cache all players' UUIDs and their account data
         playerAccounts = cachePlayerAccounts();
+
+        // Set "updateBaltopTaskRunning"
+        updateBaltopTaskRunning = new AtomicBoolean(false);
 
         // Schedule repeating baltop update task
         scheduleBaltopUpdateTask();
@@ -330,21 +337,32 @@ public class TheosisEconomy extends JavaPlugin
         // Call "updateBaltop" on a schedule (frequency defined in config.yml) and set "baltop" and "combinedTotalBalance" to its results
         updateBaltopTaskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(this, () ->
         {
+            // Don't update baltop if a task is already running
+            if (updateBaltopTaskRunning.compareAndSet(false, true))
+            {
+                return;
+            }
+
             // Create BalanceTopSortEvent instance with an initial empty HashSet of excluded players' UUIDs
             BalanceTopSortEvent balanceTopSortEvent = new BalanceTopSortEvent(new HashSet<>());
 
             // Call the event
             Bukkit.getServer().getPluginManager().callEvent(balanceTopSortEvent);
 
-            // Call "updateBaltop", passing in the HashSet of excluded players' UUIDs, if the event was NOT cancelled
-            if (!balanceTopSortEvent.isCancelled())
+            // If the event was cancelled, return
+            if (balanceTopSortEvent.isCancelled())
             {
-                updateBaltop(balanceTopSortEvent.getExcludedPlayers()).thenAccept(pair ->
-                {
-                    baltop = pair.getLeft();
-                    combinedTotalBalance = pair.getRight();
-                });
+                return;
             }
+
+            // Call "updateBaltop", passing in the HashSet of excluded players' UUIDs
+            updateBaltop(balanceTopSortEvent.getExcludedPlayers()).thenAccept(pair ->
+            {
+                baltop = pair.getLeft();
+                combinedTotalBalance = pair.getRight();
+
+                updateBaltopTaskRunning.set(false);
+            });
         }, 0L, getConfig().getLong("settings.baltop.update-task-frequency"));
     }
 
@@ -498,6 +516,9 @@ public class TheosisEconomy extends JavaPlugin
 
         // Cancel the current repeating baltop update task
         scheduler.cancelTask(updateBaltopTaskId);
+
+        // Re-set "updateBaltopTaskRunning"
+        updateBaltopTaskRunning.set(false);
 
         // Re-schedule repeating baltop update task
         scheduleBaltopUpdateTask();
