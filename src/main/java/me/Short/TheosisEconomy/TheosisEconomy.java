@@ -34,6 +34,9 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -404,7 +407,7 @@ public class TheosisEconomy extends JavaPlugin
             {
                 OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
 
-                if (!excludedPlayers.contains(uuid) && !(balanceTopConsiderExcludePermission && permissions.playerHas(null, player, "theosiseconomy.balancetop.exclude")) && (!balanceTopExcludeBannedPlayers || !((liteBansInstalled && Database.get().isPlayerBanned(uuid, null)) || player.isBanned())))
+                if (!excludedPlayers.contains(uuid) && !(balanceTopConsiderExcludePermission && permissions.playerHas(null, player, "theosiseconomy.balancetop.exclude")) && (!balanceTopExcludeBannedPlayers || !((liteBansInstalled && Database.get().isPlayerBanned(uuid, getPlayerIpFromLiteBansDatabase(uuid))) || player.isBanned())))
                 {
                     PlayerAccount account = playerAccounts.get(uuid);
                     BigDecimal balance = account.getBalance();
@@ -524,6 +527,29 @@ public class TheosisEconomy extends JavaPlugin
 
         // Re-schedule repeating BalanceTop update task
         scheduleBalanceTopUpdateTask();
+    }
+
+    // Method to get a player's most recent IP address according to LiteBans' database - only call off the main thread
+    private String getPlayerIpFromLiteBansDatabase(UUID uuid)
+    {
+        try (PreparedStatement preparedStatement = Database.get().prepareStatement("SELECT ip FROM {history} WHERE uuid=? ORDER BY date DESC LIMIT 1"))
+        {
+            preparedStatement.setString(1, uuid.toString());
+
+            try (ResultSet resultSet = preparedStatement.executeQuery())
+            {
+                if (resultSet.next())
+                {
+                    return resultSet.getString(1);
+                }
+            }
+        }
+        catch (SQLException exception)
+        {
+            exception.printStackTrace();
+        }
+
+        return null;
     }
 
     // ----- Getters -----
