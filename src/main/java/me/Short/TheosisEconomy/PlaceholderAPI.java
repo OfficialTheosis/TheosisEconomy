@@ -56,6 +56,11 @@ public class PlaceholderAPI extends PlaceholderExpansion
         // %theosiseconomy_accepting_payments%
         if (params.equalsIgnoreCase("accepting_payments"))
         {
+            if (player == null)
+            {
+                return null;
+            }
+
             return Boolean.toString(instance.getPlayerAccounts().get(player.getUniqueId()).getAcceptingPayments());
         }
 
