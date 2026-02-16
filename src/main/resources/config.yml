@@ -65,10 +65,10 @@ settings:
     # Default: false
     consider-exclude-permission: false
 
-    # Whether to exclude players who are banned from your server from the list
+    # Whether to exclude players who are permanently banned from your server from the list
     #      - Currently supports: vanilla bans, LiteBans
     # Default: false
-    exclude-banned-players: false
+    exclude-permanently-banned-players: false
 
   # Settings related to commands
   commands:
