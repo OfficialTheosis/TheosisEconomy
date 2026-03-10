@@ -307,7 +307,7 @@ public class TheosisEconomy extends JavaPlugin
         updateBalanceTopTask = Bukkit.getScheduler().runTaskTimer(this, () ->
         {
             // Don't update BalanceTop if a task is already running
-            if (updateBalanceTopTaskRunning.compareAndSet(false, true))
+            if (!updateBalanceTopTaskRunning.compareAndSet(false, true))
             {
                 return;
             }
