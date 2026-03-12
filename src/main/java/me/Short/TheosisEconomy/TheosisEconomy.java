@@ -255,7 +255,7 @@ public class TheosisEconomy extends JavaPlugin
     // Method to cache all player accounts from their respective JSON files in the "player-accounts" folder
     private Map<UUID, PlayerAccount> cachePlayerAccounts()
     {
-        Map<UUID, PlayerAccount> playerAccounts = new HashMap<>();
+        Map<UUID, PlayerAccount> playerAccounts = new ConcurrentHashMap<>();
 
         File playerAccountsFolder = new File(getDataFolder(), "player-accounts");
 
