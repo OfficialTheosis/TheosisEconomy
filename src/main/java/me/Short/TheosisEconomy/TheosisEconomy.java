@@ -321,13 +321,22 @@ public class TheosisEconomy extends JavaPlugin
             // If the event was cancelled, return
             if (balanceTopSortEvent.isCancelled())
             {
+                updateBalanceTopTaskRunning.set(false);
+
                 return;
             }
 
             // Call "updateBalanceTop", passing in the HashSet of excluded players' UUIDs
-            updateBalanceTop(balanceTopSortEvent.getExcludedPlayers()).thenAccept(balanceTop ->
+            updateBalanceTop(balanceTopSortEvent.getExcludedPlayers()).whenComplete((balanceTop, throwable) ->
             {
-                this.balanceTop = balanceTop;
+                if (throwable == null)
+                {
+                    this.balanceTop = balanceTop;
+                }
+                else
+                {
+                    throwable.printStackTrace();
+                }
 
                 updateBalanceTopTaskRunning.set(false);
             });
