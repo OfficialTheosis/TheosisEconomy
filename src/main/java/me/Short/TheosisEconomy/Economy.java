@@ -2,7 +2,6 @@ package me.Short.TheosisEconomy;
 
 import net.milkbowl.vault.economy.EconomyResponse;
 import net.milkbowl.vault.economy.EconomyResponse.ResponseType;
-import org.apache.commons.lang3.StringUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -58,22 +57,20 @@ public class Economy implements net.milkbowl.vault.economy.Economy
     @Override
     public String format(double amount)
     {
-        int fractionalDigits = fractionalDigits();
-
-        // Determine decimal format based on the configured number of decimal places ("fractionalDigits")
-        DecimalFormat df;
-        if (fractionalDigits > 0 && amount % 1 != 0)
+        // Determine which formatter to use, depending on how many decimal places the currency is configured to use, and whether the amount is a whole number
+        DecimalFormat formatter;
+        if (fractionalDigits() > 0 && amount % 1 != 0)
         {
-            df = new DecimalFormat("#,##0." + StringUtils.repeat("0", fractionalDigits));
+            formatter = instance.getDecimalFormatter();
         }
         else
         {
-            df = new DecimalFormat("#,##0");
+            formatter = instance.getWholeNumberFormatter();
         }
 
         // Return formatted output, applying decimal format to the amount
         return instance.getConfig().getString("settings.currency.format")
-                .replace("<amount>", df.format(amount))
+                .replace("<amount>", formatter.format(amount))
                 .replace("<name>", amount == 1D ? currencyNameSingular() : currencyNamePlural());
     }
 

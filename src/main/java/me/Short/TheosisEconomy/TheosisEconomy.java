@@ -33,6 +33,7 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.text.DecimalFormat;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -66,6 +67,10 @@ public class TheosisEconomy extends JavaPlugin
 
     // Instance of the Gson library
     private Gson gson;
+
+    // Decimal formatters
+    private DecimalFormat decimalFormatter;
+    private DecimalFormat wholeNumberFormatter;
 
     // Instance of the Vault Economy API
     private net.milkbowl.vault.economy.Economy economy;
@@ -128,6 +133,10 @@ public class TheosisEconomy extends JavaPlugin
 
         // Create instance of Gson
         gson = new GsonBuilder().setPrettyPrinting().create();
+
+        // Set decimal formatters
+        decimalFormatter = new DecimalFormat("#,##0." + "0".repeat(getConfig().getInt("settings.currency.decimal-places")));
+        wholeNumberFormatter = new DecimalFormat("#,##0");
 
         // Register TheosisEconomy as a Vault Economy provider
         economy = new Economy(this);
@@ -521,6 +530,9 @@ public class TheosisEconomy extends JavaPlugin
         // Re-schedule repeating data save task
         runSaveDirtyPlayerAccountsLoop();
 
+        // Re-set "decimalFormatter", since the number of decimal places the currency is configured to use may have changed
+        decimalFormatter = new DecimalFormat("#,##0." + "0".repeat(getConfig().getInt("settings.currency.decimal-places")));
+
         // Re-cache player accounts
         playerAccounts = cachePlayerAccounts();
 
@@ -542,13 +554,25 @@ public class TheosisEconomy extends JavaPlugin
         return dirtyPlayerAccountSnapshots;
     }
 
+    // Getter for "decimalFormatter"
+    public DecimalFormat getDecimalFormatter()
+    {
+        return decimalFormatter;
+    }
+
+    // Getter for "wholeNumberFormatter"
+    public DecimalFormat getWholeNumberFormatter()
+    {
+        return wholeNumberFormatter;
+    }
+
     // Getter for "economy"
     public net.milkbowl.vault.economy.Economy getEconomy()
     {
         return economy;
     }
 
-    // Getter for ""
+    // Getter for "offlinePlayerNames"
     public Map<UUID, String> getOfflinePlayerNames()
     {
         return offlinePlayerNames;
