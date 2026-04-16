@@ -1,6 +1,6 @@
 plugins {
     id("java")
-    id("com.gradleup.shadow") version "9.3.0"
+    id("com.gradleup.shadow") version "9.4.1"
 }
 
 group = "me.Short.TheosisEconomy"
@@ -14,6 +14,11 @@ tasks {
     shadowJar {
         // Make it so that a separate jar with "-all" at the end doesn't generate (https://imperceptiblethoughts.com/shadow/configuration/#configuring-output-name)
         archiveClassifier.set("")
+
+        dependencies {
+            // Only merge bStats into the final jar, no other dependencies
+            exclude { it.moduleGroup != "org.bstats" }
+        }
 
         // Relocations
         relocate("org.bstats", "shadow.org.bstats")
@@ -29,10 +34,10 @@ repositories {
 }
 
 dependencies {
-    implementation("org.bstats:bstats-bukkit:3.1.0")
+    implementation("org.bstats:bstats-bukkit:3.2.1")
 
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7.1")
-    compileOnly("me.clip:placeholderapi:2.11.7")
+    compileOnly("me.clip:placeholderapi:2.12.2")
     compileOnly("com.gitlab.ruany:LiteBansAPI:0.6.1")
 }

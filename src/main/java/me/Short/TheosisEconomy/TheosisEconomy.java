@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonIOException;
 import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import me.Short.TheosisEconomy.Commands.BalanceCommand;
 import me.Short.TheosisEconomy.Commands.BalanceTopCommand;
 import me.Short.TheosisEconomy.Commands.EconomyCommand;
@@ -21,7 +22,6 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.io.FileReader;
@@ -88,7 +88,7 @@ public class TheosisEconomy extends JavaPlugin
     private BalanceTop balanceTop;
 
     // The top balances update task, so it can be cancelled in the event of a reload
-    private BukkitTask updateBalanceTopTask;
+    private ScheduledTask updateBalanceTopTask;
 
     // Flag to determine whether a top balances update task is running - used to prevent tasks from being able to overlap
     private AtomicBoolean updateBalanceTopTaskRunning;
@@ -235,10 +235,8 @@ public class TheosisEconomy extends JavaPlugin
     {
         try
         {
-            logFileHandler = new FileHandler(getDataFolder().getAbsolutePath() + "/logs.log", true);
-
+            FileHandler logFileHandler = new FileHandler(getDataFolder().getAbsolutePath() + File.separator + "logs.log", true);
             logFileHandler.setFormatter(new LogFormatter());
-
             getLogger().addHandler(logFileHandler);
 
         }
@@ -313,7 +311,7 @@ public class TheosisEconomy extends JavaPlugin
     // Method to schedule a repeating BalanceTop update task
     private void scheduleBalanceTopUpdateTask()
     {
-        updateBalanceTopTask = Bukkit.getScheduler().runTaskTimer(this, () ->
+        updateBalanceTopTask = Bukkit.getGlobalRegionScheduler().runAtFixedRate(this, task ->
         {
             // Don't update BalanceTop if a task is already running
             if (!updateBalanceTopTaskRunning.compareAndSet(false, true))
@@ -349,7 +347,7 @@ public class TheosisEconomy extends JavaPlugin
 
                 updateBalanceTopTaskRunning.set(false);
             });
-        }, 0L, getConfig().getLong("settings.balancetop.update-task-frequency"));
+        }, 1L, getConfig().getLong("settings.balancetop.update-task-frequency"));
     }
 
     // Method to repeatedly call `saveDirtyPlayerAccounts()` async

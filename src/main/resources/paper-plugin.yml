@@ -3,6 +3,7 @@ version: 2.0.0
 main: me.Short.TheosisEconomy.TheosisEconomy
 description: A simple, yet customisable and robust, Vault-based economy provider.
 api-version: '1.21.11'
+folia-supported: true
 
 load: STARTUP
 
