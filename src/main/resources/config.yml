@@ -129,10 +129,10 @@ settings:
     balancetop-position-balance_formatted-none: "N/A"
 
     # What the %theosiseconomy_richest_<position>_entry% placeholder will be replaced with if there is no player in the specified position on "/balancetop"
-    balancetop-position-entry-none: "N/A"
+    balancetop-position-entry-none: ""
 
     # What the %theosiseconomy_richest_<position>_entry_legacy% placeholder will be replaced with if there is no player in the specified position on "/balancetop"
-    balancetop-position-entry-legacy-none: "N/A"
+    balancetop-position-entry-legacy-none: ""
 
   # Settings related to the logging of important things that TheosisEconomy does
   #      - Log messages do not support colour codes; they should just be plain strings
@@ -291,7 +291,7 @@ messages:
       # What the command sender receives upon giving money to a player
       #      - <target> will be replaced with the target's username
       #      - <amount> will be replaced with the amount given
-      money-given-sender: "<dark_aqua>Given <gold><amount></gold> to <gold><target></gold>.</dark_aqua>"
+      money-given-sender: "<dark_aqua>Gave <gold><amount></gold> to <gold><target></gold>.</dark_aqua>"
 
     # Messages related to the "take" sub-command
     take:
