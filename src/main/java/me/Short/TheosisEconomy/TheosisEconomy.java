@@ -132,7 +132,7 @@ public class TheosisEconomy extends JavaPlugin
         }
 
         // Create instance of Gson
-        gson = new GsonBuilder().setPrettyPrinting().create();
+        gson = new GsonBuilder().create();
 
         // Set decimal formatters
         decimalFormatter = new DecimalFormat("#,##0." + "0".repeat(getConfig().getInt("settings.currency.decimal-places")));
