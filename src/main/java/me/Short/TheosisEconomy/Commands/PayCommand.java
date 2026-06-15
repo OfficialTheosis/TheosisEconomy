@@ -219,7 +219,7 @@ public class PayCommand
         if (target instanceof Player)
         {
             ((Player) target).sendMessage(miniMessage.deserialize(config.getString("messages.pay.paid-target"),
-                    Placeholder.component("player", Component.text(senderPlayer.getName())),
+                    Placeholder.component("player", senderPlayer.name()),
                     Placeholder.component("amount", Component.text(amountFormatted))));
         }
 
