@@ -131,7 +131,11 @@ public class TheosisEconomy extends JavaPlugin
         // Enable file logging to "logs.log" if config.yml says to do so
         if (getConfig().getBoolean("settings.logging.log-file"))
         {
-            setupLogFileHandler();
+            logFileHandler = setupLogFileHandler();
+        }
+        else
+        {
+            logFileHandler = null;
         }
 
         // Create instance of Gson
@@ -237,7 +241,7 @@ public class TheosisEconomy extends JavaPlugin
     }
 
     // Method to set up "logFileHandler" and set it to this plugin's logger
-    private void setupLogFileHandler()
+    private FileHandler setupLogFileHandler()
     {
         try
         {
@@ -245,6 +249,7 @@ public class TheosisEconomy extends JavaPlugin
             logFileHandler.setFormatter(new LogFormatter());
             getLogger().addHandler(logFileHandler);
 
+            return logFileHandler;
         }
         catch (IOException exception)
         {
@@ -492,14 +497,25 @@ public class TheosisEconomy extends JavaPlugin
         {
             if (logFileHandler != null)
             {
-                if (!Arrays.asList(logger.getHandlers()).contains(logFileHandler))
+                boolean loggerContainsFileHandler = false;
+
+                for (Handler handler : logger.getHandlers())
+                {
+                    if (handler == logFileHandler)
+                    {
+                        loggerContainsFileHandler = true;
+                        break;
+                    }
+                }
+
+                if (!loggerContainsFileHandler)
                 {
                     logger.addHandler(logFileHandler);
                 }
             }
             else
             {
-                setupLogFileHandler();
+                logFileHandler = setupLogFileHandler();
             }
         }
         else
@@ -509,7 +525,7 @@ public class TheosisEconomy extends JavaPlugin
             {
                 for (Handler handler : logger.getHandlers())
                 {
-                    if (handler.equals(logFileHandler))
+                    if (handler == logFileHandler)
                     {
                         logger.removeHandler(logFileHandler);
                         break;
