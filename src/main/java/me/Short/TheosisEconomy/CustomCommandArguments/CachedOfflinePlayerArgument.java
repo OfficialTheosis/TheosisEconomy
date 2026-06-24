@@ -18,6 +18,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
+import org.geysermc.floodgate.api.FloodgateApi;
 import org.jspecify.annotations.NullMarked;
 
 import java.util.Locale;
@@ -78,9 +79,26 @@ public class CachedOfflinePlayerArgument implements CustomArgumentType<OfflinePl
     @Override
     public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder)
     {
-        instance.getOfflinePlayerNames().values().stream()
-                .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(builder.getRemainingLowerCase()))
-                .forEach(builder::suggest);
+        if (instance.getFloodgateInstalled())
+        {
+            String remainingLowerCase = builder.getRemainingLowerCase();
+            String floodgateUsernamePrefixLowerCase = FloodgateApi.getInstance().getPlayerPrefix().toLowerCase(Locale.ROOT);
+            int floodgateUsernamePrefixLowerCaseLength = floodgateUsernamePrefixLowerCase.length();
+
+            instance.getMostRecentPlayerNames().values().stream()
+                    .filter(name ->
+                    {
+                        String nameLowerCase = name.toLowerCase(Locale.ROOT);
+                        return nameLowerCase.startsWith(remainingLowerCase) || (nameLowerCase.startsWith(floodgateUsernamePrefixLowerCase) && nameLowerCase.substring(floodgateUsernamePrefixLowerCaseLength).startsWith(remainingLowerCase));
+                    })
+                    .forEach(builder::suggest);
+        }
+        else
+        {
+            instance.getMostRecentPlayerNames().values().stream()
+                    .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(builder.getRemainingLowerCase()))
+                    .forEach(builder::suggest);
+        }
 
         return builder.buildFuture();
     }

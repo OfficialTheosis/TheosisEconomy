@@ -87,7 +87,7 @@ public class PlaceholderAPI extends PlaceholderExpansion
 
                 if (position <= topBalancesEntries.size())
                 {
-                    return instance.getOfflinePlayerNames().get(topBalancesEntries.get(position - 1).getKey());
+                    return Bukkit.getOfflinePlayer(topBalancesEntries.get(position - 1).getKey()).getName();
                 }
 
                 return instance.getConfig().getString("settings.placeholders.balancetop-position-name-none");

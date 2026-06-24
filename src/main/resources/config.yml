@@ -254,6 +254,9 @@ settings:
   # Miscellaneous settings
   misc:
 
+    # The maximum number of player names that should be cached for offline tab completion - the most recently-seen players are cached
+    most-recent-player-names-cache-max-size: 4000
+
     # How often you want player data files to be saved in the background, in seconds
     #       - Each save will only happen if a change was made since the previous save, such as a player's balance changing
     # Default: 5

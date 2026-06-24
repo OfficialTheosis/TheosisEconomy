@@ -19,6 +19,7 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
+import org.geysermc.floodgate.api.FloodgateApi;
 import org.jspecify.annotations.NullMarked;
 
 import java.math.BigDecimal;
@@ -50,18 +51,49 @@ public class PayCommand
 
                         .suggests((ctx, builder) -> CompletableFuture.supplyAsync(() ->
                         {
-                            if (ctx.getSource().getSender() instanceof Player senderPlayer)
+                            if (instance.getFloodgateInstalled())
                             {
-                                instance.getOfflinePlayerNames().values().stream()
-                                        .filter(name -> !name.equals(senderPlayer.getName()) && name.toLowerCase(Locale.ROOT).startsWith(builder.getRemainingLowerCase()))
-                                        .forEach(builder::suggest);
+                                String remainingLowerCase = builder.getRemainingLowerCase();
+                                String floodgateUsernamePrefixLowerCase = FloodgateApi.getInstance().getPlayerPrefix().toLowerCase(Locale.ROOT);
+                                int floodgateUsernamePrefixLowerCaseLength = floodgateUsernamePrefixLowerCase.length();
+
+                                if (ctx.getSource().getSender() instanceof Player senderPlayer)
+                                {
+                                    instance.getMostRecentPlayerNames().values().stream()
+                                            .filter(name ->
+                                            {
+                                                String nameLowerCase = name.toLowerCase(Locale.ROOT);
+                                                return !name.equals(senderPlayer.getName()) && nameLowerCase.startsWith(remainingLowerCase) || (nameLowerCase.startsWith(floodgateUsernamePrefixLowerCase) && nameLowerCase.substring(floodgateUsernamePrefixLowerCaseLength).startsWith(remainingLowerCase));
+                                            })
+                                            .forEach(builder::suggest);
+                                }
+                                else
+                                {
+                                    instance.getMostRecentPlayerNames().values().stream()
+                                            .filter(name ->
+                                            {
+                                                String nameLowerCase = name.toLowerCase(Locale.ROOT);
+                                                return nameLowerCase.startsWith(remainingLowerCase) || (nameLowerCase.startsWith(floodgateUsernamePrefixLowerCase) && nameLowerCase.substring(floodgateUsernamePrefixLowerCaseLength).startsWith(remainingLowerCase));
+                                            })
+                                            .forEach(builder::suggest);
+                                }
                             }
                             else
                             {
-                                instance.getOfflinePlayerNames().values().stream()
-                                        .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(builder.getRemainingLowerCase()))
-                                        .forEach(builder::suggest);
+                                if (ctx.getSource().getSender() instanceof Player senderPlayer)
+                                {
+                                    instance.getMostRecentPlayerNames().values().stream()
+                                            .filter(name -> !name.equals(senderPlayer.getName()) && name.toLowerCase(Locale.ROOT).startsWith(builder.getRemainingLowerCase()))
+                                            .forEach(builder::suggest);
+                                }
+                                else
+                                {
+                                    instance.getMostRecentPlayerNames().values().stream()
+                                            .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(builder.getRemainingLowerCase()))
+                                            .forEach(builder::suggest);
+                                }
                             }
+
 
                             return builder.build();
                         }))

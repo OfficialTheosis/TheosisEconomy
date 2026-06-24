@@ -2,7 +2,7 @@ name: TheosisEconomy
 version: 2.0.0
 main: me.Short.TheosisEconomy.TheosisEconomy
 description: A simple, yet customisable and robust, Vault-based economy provider.
-api-version: '1.21.11'
+api-version: '26.1.2'
 folia-supported: true
 
 load: STARTUP
@@ -18,6 +18,10 @@ dependencies:
       required: false
       join-classpath: true
     LiteBans:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    floodgate:
       load: BEFORE
       required: false
       join-classpath: true

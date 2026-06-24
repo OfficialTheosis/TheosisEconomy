@@ -78,8 +78,8 @@ public class TheosisEconomy extends JavaPlugin
     // Instance of the Vault Permissions API
     private Permission permissions;
 
-    // Cache of all players' usernames, for the purpose of offline player tab completion
-    private Map<UUID, String> offlinePlayerNames;
+    // Cached names of players who have most recently been seen on the server - used for offline tab completion
+    private Map<UUID, String> mostRecentPlayerNames;
 
     // Cache of all player accounts
     private Map<UUID, PlayerAccount> playerAccounts;
@@ -101,6 +101,9 @@ public class TheosisEconomy extends JavaPlugin
 
     // Whether LiteBans is installed - for checking in the "updateBalanceTop" method
     private boolean liteBansInstalled;
+
+    // Whether Floodgate is installed - for excluding Floodgate player prefixes in tab completion
+    private boolean floodgateInstalled;
 
     // Config options that may need to be retrieved in the "updateBalanceTop" method later
     private boolean balanceTopConsiderExcludePermission;
@@ -187,11 +190,14 @@ public class TheosisEconomy extends JavaPlugin
         // Get whether LiteBans is installed
         liteBansInstalled = pluginManager.getPlugin("LiteBans") != null;
 
+        // Get whether Floodgate is installed
+        floodgateInstalled = pluginManager.getPlugin("floodgate") != null;
+
         // bStats
         Metrics metrics = new Metrics(this, 13836);
 
-        // Cache all offline player names
-        offlinePlayerNames = cacheOfflinePlayerNames();
+        // Cache most recent player names
+        mostRecentPlayerNames = cacheMostRecentPlayerNames();
 
         // Cache all players' UUIDs and their account data
         playerAccounts = cachePlayerAccounts();
@@ -246,17 +252,24 @@ public class TheosisEconomy extends JavaPlugin
         }
     }
 
-    // Method to cache all offline player names
-    private Map<UUID, String> cacheOfflinePlayerNames()
+    // Method to cache most recent player names
+    private Map<UUID, String> cacheMostRecentPlayerNames()
     {
-        Map<UUID, String> offlinePlayerNames = new ConcurrentHashMap<>();
-
-        for (OfflinePlayer player : Bukkit.getOfflinePlayers())
+        Map<UUID, String> mostRecentPlayerNames = new LinkedHashMap<>()
         {
-            offlinePlayerNames.put(player.getUniqueId(), player.getName());
-        }
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<UUID, String> eldest)
+            {
+                return size() > getConfig().getInt("settings.misc.most-recent-player-names-cache-max-size");
+            }
+        };
 
-        return offlinePlayerNames;
+        Arrays.stream(Bukkit.getOfflinePlayers())
+                .filter(offlinePlayer -> offlinePlayer.getName() != null)
+                .sorted(Comparator.comparingLong(OfflinePlayer::getLastSeen))
+                .forEach(offlinePlayer -> mostRecentPlayerNames.put(offlinePlayer.getUniqueId(), offlinePlayer.getName()));
+
+        return mostRecentPlayerNames;
     }
 
     // Method to cache all player accounts from their respective JSON files in the "player-accounts" folder
@@ -454,6 +467,9 @@ public class TheosisEconomy extends JavaPlugin
         balanceTopExcludePermanentlyBannedPlayers = getConfig().getBoolean("settings.balancetop.exclude-permanently-banned-players");
         balanceTopMinBalance = new BigDecimal(getConfig().getString("settings.balancetop.min-balance"));
 
+        // Re-cache most recent player names
+        mostRecentPlayerNames = cacheMostRecentPlayerNames();
+
         // Set whether to send logs to console
         Logger logger = getLogger();
         if (getConfig().getBoolean("settings.logging.log-console"))
@@ -570,10 +586,16 @@ public class TheosisEconomy extends JavaPlugin
         return economy;
     }
 
-    // Getter for "offlinePlayerNames"
-    public Map<UUID, String> getOfflinePlayerNames()
+    // Getter for "floodgateInstalled"
+    public boolean getFloodgateInstalled()
     {
-        return offlinePlayerNames;
+        return floodgateInstalled;
+    }
+
+    // Getter for "mostRecentPlayerNames"
+    public Map<UUID, String> getMostRecentPlayerNames()
+    {
+        return mostRecentPlayerNames;
     }
 
     // Getter for "playerAccounts"

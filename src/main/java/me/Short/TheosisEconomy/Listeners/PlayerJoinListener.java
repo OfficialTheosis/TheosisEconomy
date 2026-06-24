@@ -9,6 +9,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 
 import java.math.BigDecimal;
+import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -32,7 +33,9 @@ public class PlayerJoinListener implements Listener
         String playerName = player.getName();
 
         // Cache the player's username
-        instance.getOfflinePlayerNames().put(uuid, playerName);
+        Map<UUID, String> mostRecentPlayerNames = instance.getMostRecentPlayerNames();
+        mostRecentPlayerNames.remove(uuid);
+        mostRecentPlayerNames.put(uuid, playerName);
 
         Economy economy = instance.getEconomy();
 
