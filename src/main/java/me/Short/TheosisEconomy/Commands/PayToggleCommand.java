@@ -15,10 +15,8 @@ import java.util.UUID;
 public class PayToggleCommand implements BasicCommand
 {
 
-    // Instance of "TheosisEconomy"
-    private TheosisEconomy instance;
+    private final TheosisEconomy instance;
 
-    // Constructor
     public PayToggleCommand(TheosisEconomy mainInstance)
     {
         this.instance = mainInstance;

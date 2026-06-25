@@ -59,7 +59,7 @@ public class PayCommand
 
                                 if (ctx.getSource().getSender() instanceof Player senderPlayer)
                                 {
-                                    instance.getMostRecentPlayerNames().values().stream()
+                                    instance.getMostRecentPlayerNamesStore().getMostRecentPlayerNamesSet().stream()
                                             .filter(name ->
                                             {
                                                 String nameLowerCase = name.toLowerCase(Locale.ROOT);
@@ -69,7 +69,7 @@ public class PayCommand
                                 }
                                 else
                                 {
-                                    instance.getMostRecentPlayerNames().values().stream()
+                                    instance.getMostRecentPlayerNamesStore().getMostRecentPlayerNamesSet().stream()
                                             .filter(name ->
                                             {
                                                 String nameLowerCase = name.toLowerCase(Locale.ROOT);
@@ -82,13 +82,13 @@ public class PayCommand
                             {
                                 if (ctx.getSource().getSender() instanceof Player senderPlayer)
                                 {
-                                    instance.getMostRecentPlayerNames().values().stream()
+                                    instance.getMostRecentPlayerNamesStore().getMostRecentPlayerNamesSet().stream()
                                             .filter(name -> !name.equals(senderPlayer.getName()) && name.toLowerCase(Locale.ROOT).startsWith(builder.getRemainingLowerCase()))
                                             .forEach(builder::suggest);
                                 }
                                 else
                                 {
-                                    instance.getMostRecentPlayerNames().values().stream()
+                                    instance.getMostRecentPlayerNamesStore().getMostRecentPlayerNamesSet().stream()
                                             .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(builder.getRemainingLowerCase()))
                                             .forEach(builder::suggest);
                                 }

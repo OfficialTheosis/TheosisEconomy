@@ -41,7 +41,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -80,13 +79,13 @@ public class TheosisEconomy extends JavaPlugin
     private MiniMessage miniMessage;
 
     // Cached names of players who have most recently been seen on the server - used for offline tab completion
-    private Map<UUID, String> mostRecentPlayerNames;
+    private MostRecentPlayerNamesStore mostRecentPlayerNamesStore;
 
     // Cache of all player accounts
     private Map<UUID, PlayerAccount> playerAccounts;
 
     // Top balances and combined total balance
-    private BalanceTop balanceTop = new BalanceTop(new LinkedHashMap<>(), BigDecimal.ZERO);
+    private volatile BalanceTop balanceTop = new BalanceTop(new LinkedHashMap<>(), BigDecimal.ZERO);
 
     // The top balances update task, so it can be cancelled in the event of a reload
     private ScheduledTask updateBalanceTopTask;
@@ -147,6 +146,9 @@ public class TheosisEconomy extends JavaPlugin
         miniMessage = MiniMessage.miniMessage();
         legacyComponentSerializer = LegacyComponentSerializer.legacySection();
 
+        // Set "mostRecentPlayerNamesStore"
+        mostRecentPlayerNamesStore = new MostRecentPlayerNamesStore(this, getDataFolder().toPath().resolve("most-recent-player-names.json"), getConfig().getInt("settings.misc.most-recent-player-names-cache-max-size"));
+
         // Get config options from config.yml here, so they don't need to be retrieved in the async "updateBalanceTop" method later
         balanceTopConsiderExcludePermission = getConfig().getBoolean("settings.balancetop.consider-exclude-permission");
         balanceTopExcludePermanentlyBannedPlayers = getConfig().getBoolean("settings.balancetop.exclude-permanently-banned-players");
@@ -187,9 +189,6 @@ public class TheosisEconomy extends JavaPlugin
         // bStats
         Metrics metrics = new Metrics(this, 13836);
 
-        // Cache most recent player names
-        mostRecentPlayerNames = cacheMostRecentPlayerNames();
-
         // Cache all players' UUIDs and their account data
         playerAccounts = cachePlayerAccounts();
 
@@ -220,6 +219,9 @@ public class TheosisEconomy extends JavaPlugin
             Thread.currentThread().interrupt();
         }
 
+        // Shut down and save the most recent player names
+        mostRecentPlayerNamesStore.shutdownAndSave();
+
         // Ensure any remaining dirty player accounts are saved
         saveDirtyPlayerAccounts();
     }
@@ -235,58 +237,10 @@ public class TheosisEconomy extends JavaPlugin
 
             return logFileHandler;
         }
-        catch (IOException exception)
+        catch (IOException e)
         {
-            throw new RuntimeException(exception);
+            throw new RuntimeException(e);
         }
-    }
-
-    // Method to cache most recent player names
-    private Map<UUID, String> cacheMostRecentPlayerNames()
-    {
-        int mostRecentPlayersMaxSize = getConfig().getInt("settings.misc.most-recent-player-names-cache-max-size");
-
-        Map<UUID, String> mostRecentPlayerNames = new LinkedHashMap<>()
-        {
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<UUID, String> eldest)
-            {
-                return size() > mostRecentPlayersMaxSize;
-            }
-        };
-
-        PriorityQueue<OfflinePlayer> mostRecentPlayers = new PriorityQueue<>(Comparator.comparingLong(OfflinePlayer::getLastSeen));
-
-        for (OfflinePlayer player : Bukkit.getOfflinePlayers())
-        {
-            // Populate `mostRecentPlayers` with the players who have most recently been seen (unsorted)
-            if (player.getName() != null)
-            {
-                if (mostRecentPlayers.size() < mostRecentPlayersMaxSize)
-                {
-                    mostRecentPlayers.add(player);
-                }
-                else
-                {
-                    OfflinePlayer oldest = mostRecentPlayers.peek();
-
-                    if (oldest != null && player.getLastSeen() > oldest.getLastSeen())
-                    {
-                        mostRecentPlayers.poll();
-                        mostRecentPlayers.add(player);
-                    }
-                }
-            }
-        }
-
-        // Populate `mostRecentPlayerNames`
-        while (!mostRecentPlayers.isEmpty())
-        {
-            OfflinePlayer player = mostRecentPlayers.poll();
-            mostRecentPlayerNames.put(player.getUniqueId(), player.getName());
-        }
-
-        return mostRecentPlayerNames;
     }
 
     // Method to cache all player accounts from their respective JSON files in the "player-accounts" folder
@@ -323,15 +277,13 @@ public class TheosisEconomy extends JavaPlugin
                     playerAccounts.put(uuid, gson.fromJson(reader, PlayerAccount.class));
                 }
             }
-            catch (IllegalArgumentException exception)
+            catch (IllegalArgumentException e)
             {
-                getLogger().log(Level.WARNING, "Failed to load player account - invalid UUID in file name: " + file.getName());
-                exception.printStackTrace();
+                getLogger().log(Level.WARNING, "Failed to load player account - invalid UUID in file name: " + file.getName(), e);
             }
-            catch (IOException | JsonIOException exception)
+            catch (IOException | JsonIOException e)
             {
-                getLogger().log(Level.WARNING, "Failed to load player account - failed to read file: " + file.getName());
-                exception.printStackTrace();
+                getLogger().log(Level.WARNING, "Failed to load player account - failed to read file: " + file.getName(), e);
             }
         }
 
@@ -428,15 +380,14 @@ public class TheosisEconomy extends JavaPlugin
                 // Remove the snapshot from `dirtyPlayerAccountSnapshots` - only remove if same instance
                 dirtyPlayerAccountSnapshots.remove(uuid, playerAccountSnapshot);
             }
-            catch (IOException exception)
+            catch (IOException e)
             {
-                getLogger().log(Level.WARNING, "Failed to save player account to file: " + target);
-                exception.printStackTrace();
+                getLogger().log(Level.WARNING, "Failed to save player account to file: " + target, e);
             }
         }
     }
 
-    // Method to update BalanceTop async
+    // Method to create and return a new BalanceTop
     private CompletableFuture<BalanceTop> updateBalanceTop(Set<UUID> excludedPlayers)
     {
         return CompletableFuture.supplyAsync(() ->
@@ -483,9 +434,6 @@ public class TheosisEconomy extends JavaPlugin
         balanceTopConsiderExcludePermission = getConfig().getBoolean("settings.balancetop.consider-exclude-permission");
         balanceTopExcludePermanentlyBannedPlayers = getConfig().getBoolean("settings.balancetop.exclude-permanently-banned-players");
         balanceTopMinBalance = new BigDecimal(getConfig().getString("settings.balancetop.min-balance"));
-
-        // Re-cache most recent player names
-        mostRecentPlayerNames = cacheMostRecentPlayerNames();
 
         // Set whether to send logs to console
         Logger logger = getLogger();
@@ -572,6 +520,12 @@ public class TheosisEconomy extends JavaPlugin
         // Re-schedule repeating data save task
         runSaveDirtyPlayerAccountsLoop();
 
+        // Shut down and save the most recent player names
+        mostRecentPlayerNamesStore.shutdownAndSave();
+
+        // Re-set "mostRecentPlayerNamesStore"
+        mostRecentPlayerNamesStore = new MostRecentPlayerNamesStore(this, getDataFolder().toPath().resolve("most-recent-player-names.json"), getConfig().getInt("settings.misc.most-recent-player-names-cache-max-size"));
+
         // Re-set "decimalFormatter", since the number of decimal places the currency is configured to use may have changed
         decimalFormatter = new DecimalFormat("#,##0." + "0".repeat(getConfig().getInt("settings.currency.decimal-places")));
 
@@ -594,6 +548,12 @@ public class TheosisEconomy extends JavaPlugin
     public Map<UUID, PlayerAccountSnapshot> getDirtyPlayerAccountSnapshots()
     {
         return dirtyPlayerAccountSnapshots;
+    }
+
+    // Getter for "gson"
+    public Gson getGson()
+    {
+        return gson;
     }
 
     // Getter for "decimalFormatter"
@@ -620,12 +580,6 @@ public class TheosisEconomy extends JavaPlugin
         return floodgateInstalled;
     }
 
-    // Getter for "mostRecentPlayerNames"
-    public Map<UUID, String> getMostRecentPlayerNames()
-    {
-        return mostRecentPlayerNames;
-    }
-
     // Getter for "playerAccounts"
     public Map<UUID, PlayerAccount> getPlayerAccounts()
     {
@@ -648,6 +602,12 @@ public class TheosisEconomy extends JavaPlugin
     public LegacyComponentSerializer getLegacyComponentSerializer()
     {
         return legacyComponentSerializer;
+    }
+
+    // Getter for "mostRecentPlayerNamesStore"
+    public MostRecentPlayerNamesStore getMostRecentPlayerNamesStore()
+    {
+        return mostRecentPlayerNamesStore;
     }
 
 }

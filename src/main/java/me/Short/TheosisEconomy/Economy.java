@@ -21,10 +21,8 @@ public class Economy implements net.milkbowl.vault.economy.Economy
     private static final String ERROR_TOO_MANY_DECIMAL_PLACES = "Too many decimal places.";
     private static final String ERROR_NOT_GREATER_THAN_ZERO = "Amount is not greater than zero.";
 
-    // Instance of "TheosisEconomy"
-    private TheosisEconomy instance;
+    private final TheosisEconomy instance;
 
-    // Constructor
     public Economy(TheosisEconomy instance)
     {
         this.instance = instance;

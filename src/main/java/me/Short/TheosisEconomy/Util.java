@@ -71,9 +71,9 @@ public class Util
                 }
             }
         }
-        catch (SQLException exception)
+        catch (SQLException e)
         {
-            exception.printStackTrace();
+            e.printStackTrace();
         }
 
         return null;

@@ -17,10 +17,8 @@ import java.util.regex.Pattern;
 public class PlaceholderAPI extends PlaceholderExpansion
 {
 
-    // Instance of "TheosisEconomy"
-    private TheosisEconomy instance;
+    private final TheosisEconomy instance;
 
-    // Constructor
     public PlaceholderAPI(TheosisEconomy instance)
     {
         this.instance = instance;
@@ -92,7 +90,7 @@ public class PlaceholderAPI extends PlaceholderExpansion
 
                 return instance.getConfig().getString("settings.placeholders.balancetop-position-name-none");
             }
-            catch (NumberFormatException exception)
+            catch (NumberFormatException e)
             {
                 return null;
             }
@@ -114,7 +112,7 @@ public class PlaceholderAPI extends PlaceholderExpansion
 
                 return instance.getConfig().getString("settings.placeholders.balancetop-position-uuid-none");
             }
-            catch (NumberFormatException exception)
+            catch (NumberFormatException e)
             {
                 return null;
             }
@@ -136,7 +134,7 @@ public class PlaceholderAPI extends PlaceholderExpansion
 
                 return instance.getConfig().getString("settings.placeholders.balancetop-position-balance-none");
             }
-            catch (NumberFormatException exception)
+            catch (NumberFormatException e)
             {
                 return null;
             }
@@ -158,7 +156,7 @@ public class PlaceholderAPI extends PlaceholderExpansion
 
                 return instance.getConfig().getString("settings.placeholders.balancetop-position-balance_formatted-none");
             }
-            catch (NumberFormatException exception)
+            catch (NumberFormatException e)
             {
                 return null;
             }
@@ -189,7 +187,7 @@ public class PlaceholderAPI extends PlaceholderExpansion
 
                 return instance.getConfig().getString("settings.placeholders.balancetop-position-entry-none");
             }
-            catch (NumberFormatException exception)
+            catch (NumberFormatException e)
             {
                 return null;
             }
@@ -220,7 +218,7 @@ public class PlaceholderAPI extends PlaceholderExpansion
 
                 return instance.getConfig().getString("settings.placeholders.balancetop-position-entry-legacy-none");
             }
-            catch (NumberFormatException exception)
+            catch (NumberFormatException e)
             {
                 return null;
             }

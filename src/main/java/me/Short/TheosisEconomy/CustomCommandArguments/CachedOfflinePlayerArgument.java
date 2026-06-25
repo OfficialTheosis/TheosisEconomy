@@ -31,7 +31,6 @@ public class CachedOfflinePlayerArgument implements CustomArgumentType<OfflinePl
     // Instance of "TheosisEconomy"
     private static TheosisEconomy instance;
 
-    // Constructor
     public CachedOfflinePlayerArgument(TheosisEconomy instance)
     {
         CachedOfflinePlayerArgument.instance = instance;
@@ -85,7 +84,7 @@ public class CachedOfflinePlayerArgument implements CustomArgumentType<OfflinePl
             String floodgateUsernamePrefixLowerCase = FloodgateApi.getInstance().getPlayerPrefix().toLowerCase(Locale.ROOT);
             int floodgateUsernamePrefixLowerCaseLength = floodgateUsernamePrefixLowerCase.length();
 
-            instance.getMostRecentPlayerNames().values().stream()
+            instance.getMostRecentPlayerNamesStore().getMostRecentPlayerNamesSet().stream()
                     .filter(name ->
                     {
                         String nameLowerCase = name.toLowerCase(Locale.ROOT);
@@ -95,7 +94,7 @@ public class CachedOfflinePlayerArgument implements CustomArgumentType<OfflinePl
         }
         else
         {
-            instance.getMostRecentPlayerNames().values().stream()
+            instance.getMostRecentPlayerNamesStore().getMostRecentPlayerNamesSet().stream()
                     .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(builder.getRemainingLowerCase()))
                     .forEach(builder::suggest);
         }

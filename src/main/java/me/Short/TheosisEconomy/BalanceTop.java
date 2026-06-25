@@ -13,7 +13,6 @@ public class BalanceTop
     // All players' balances added together
     private final BigDecimal combinedTotalBalance;
 
-    // Constructor
     public BalanceTop(Map<UUID, BigDecimal> topBalances, BigDecimal combinedTotalBalance)
     {
         this.topBalances = topBalances;

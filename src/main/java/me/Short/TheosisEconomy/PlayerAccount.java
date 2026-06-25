@@ -9,7 +9,6 @@ public class PlayerAccount
 
     private boolean acceptingPayments;
 
-    // Constructor
     public PlayerAccount(BigDecimal balance, boolean acceptingPayments)
     {
         this.balance = balance;
