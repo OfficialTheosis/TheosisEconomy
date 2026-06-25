@@ -34,12 +34,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.text.DecimalFormat;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -260,19 +260,47 @@ public class TheosisEconomy extends JavaPlugin
     // Method to cache most recent player names
     private Map<UUID, String> cacheMostRecentPlayerNames()
     {
+        int mostRecentPlayersMaxSize = getConfig().getInt("settings.misc.most-recent-player-names-cache-max-size");
+
         Map<UUID, String> mostRecentPlayerNames = new LinkedHashMap<>()
         {
             @Override
             protected boolean removeEldestEntry(Map.Entry<UUID, String> eldest)
             {
-                return size() > getConfig().getInt("settings.misc.most-recent-player-names-cache-max-size");
+                return size() > mostRecentPlayersMaxSize;
             }
         };
 
-        Arrays.stream(Bukkit.getOfflinePlayers())
-                .filter(offlinePlayer -> offlinePlayer.getName() != null)
-                .sorted(Comparator.comparingLong(OfflinePlayer::getLastSeen))
-                .forEach(offlinePlayer -> mostRecentPlayerNames.put(offlinePlayer.getUniqueId(), offlinePlayer.getName()));
+        PriorityQueue<OfflinePlayer> mostRecentPlayers = new PriorityQueue<>(Comparator.comparingLong(OfflinePlayer::getLastSeen));
+
+        for (OfflinePlayer player : Bukkit.getOfflinePlayers())
+        {
+            // Populate `mostRecentPlayers` with the players who have most recently been seen (unsorted)
+            if (player.getName() != null)
+            {
+                if (mostRecentPlayers.size() < mostRecentPlayersMaxSize)
+                {
+                    mostRecentPlayers.add(player);
+                }
+                else
+                {
+                    OfflinePlayer oldest = mostRecentPlayers.peek();
+
+                    if (oldest != null && player.getLastSeen() > oldest.getLastSeen())
+                    {
+                        mostRecentPlayers.poll();
+                        mostRecentPlayers.add(player);
+                    }
+                }
+            }
+        }
+
+        // Populate `mostRecentPlayerNames`
+        while (!mostRecentPlayers.isEmpty())
+        {
+            OfflinePlayer player = mostRecentPlayers.poll();
+            mostRecentPlayerNames.put(player.getUniqueId(), player.getName());
+        }
 
         return mostRecentPlayerNames;
     }
