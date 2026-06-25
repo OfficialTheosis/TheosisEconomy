@@ -73,7 +73,7 @@ public class PlaceholderAPI extends PlaceholderExpansion
         // %theosiseconomy_combined_total_balance_formatted%
         if (params.equalsIgnoreCase("combined_total_balance_formatted"))
         {
-            return instance.getEconomy().format(instance.getBalanceTop().getCombinedTotalBalance().doubleValue());
+            return instance.getVaultEconomy().format(instance.getBalanceTop().getCombinedTotalBalance().doubleValue());
         }
 
         // %theosiseconomy_richest_<position>_name%
@@ -153,7 +153,7 @@ public class PlaceholderAPI extends PlaceholderExpansion
 
                 if (position <= topBalancesEntries.size())
                 {
-                    return instance.getEconomy().format(topBalancesEntries.get(position - 1).getValue().doubleValue());
+                    return instance.getVaultEconomy().format(topBalancesEntries.get(position - 1).getValue().doubleValue());
                 }
 
                 return instance.getConfig().getString("settings.placeholders.balancetop-position-balance_formatted-none");
@@ -181,7 +181,7 @@ public class PlaceholderAPI extends PlaceholderExpansion
                     String entry = instance.getConfig().getString(player == entryPlayer ? "messages.balancetop.entry-you" : "messages.balancetop.entry")
                             .replace("<position>", Integer.toString(position))
                             .replace("<player>", entryPlayer.getName())
-                            .replace("<balance>", instance.getEconomy().format(topBalancesEntry.getValue().doubleValue()));
+                            .replace("<balance>", instance.getVaultEconomy().format(topBalancesEntry.getValue().doubleValue()));
 
                     return entry
                             .replace("<dots>", new String(new char[Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(instance.getMiniMessage().deserialize(entry)), true)]).replace("\0", "."));
@@ -212,7 +212,7 @@ public class PlaceholderAPI extends PlaceholderExpansion
                     String entry = instance.getConfig().getString(player == entryPlayer ? "messages.balancetop.entry-you" : "messages.balancetop.entry")
                             .replace("<position>", Integer.toString(position))
                             .replace("<player>", entryPlayer.getName())
-                            .replace("<balance>", instance.getEconomy().format(topBalancesEntry.getValue().doubleValue()));
+                            .replace("<balance>", instance.getVaultEconomy().format(topBalancesEntry.getValue().doubleValue()));
 
                     return instance.getLegacyComponentSerializer().serialize(instance.getMiniMessage().deserialize(entry
                             .replace("<dots>", new String(new char[Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(instance.getMiniMessage().deserialize(entry)), true)]).replace("\0", "."))));

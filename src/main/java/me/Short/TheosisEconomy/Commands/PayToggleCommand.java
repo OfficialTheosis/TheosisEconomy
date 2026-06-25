@@ -38,7 +38,7 @@ public class PayToggleCommand implements BasicCommand
         }
 
         // If the player does not have an account, return
-        if (!instance.getEconomy().hasAccount((player)))
+        if (!instance.getVaultEconomy().hasAccount((player)))
         {
             player.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.no-account")));
 

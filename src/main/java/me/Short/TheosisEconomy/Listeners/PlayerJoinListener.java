@@ -37,7 +37,7 @@ public class PlayerJoinListener implements Listener
         mostRecentPlayerNames.remove(uuid);
         mostRecentPlayerNames.put(uuid, playerName);
 
-        Economy economy = instance.getEconomy();
+        Economy economy = instance.getVaultEconomy();
 
         // If the player already has an account, return
         if (economy.hasAccount(player))

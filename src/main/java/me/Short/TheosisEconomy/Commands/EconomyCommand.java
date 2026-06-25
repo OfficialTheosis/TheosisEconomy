@@ -201,7 +201,7 @@ public class EconomyCommand
     // Method to execute the logic for the "set" sub-command
     private static void executeSetLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, BigDecimal amount)
     {
-        net.milkbowl.vault.economy.Economy economy = instance.getEconomy();
+        net.milkbowl.vault.economy.Economy economy = instance.getVaultEconomy();
 
         // If the target player does not have an account, return
         if (!economy.hasAccount(target))
@@ -273,7 +273,7 @@ public class EconomyCommand
     // Method to execute the logic for the "give" sub-command
     private static void executeGiveLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, BigDecimal amount)
     {
-        net.milkbowl.vault.economy.Economy economy = instance.getEconomy();
+        net.milkbowl.vault.economy.Economy economy = instance.getVaultEconomy();
 
         // If the target player does not have an account, return
         if (!economy.hasAccount(target))
@@ -348,7 +348,7 @@ public class EconomyCommand
     // Method to execute the logic for the "take" sub-command
     private static void executeTakeLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, BigDecimal amount)
     {
-        net.milkbowl.vault.economy.Economy economy = instance.getEconomy();
+        net.milkbowl.vault.economy.Economy economy = instance.getVaultEconomy();
 
         // If the target player does not have an account, return
         if (!economy.hasAccount(target))
@@ -425,7 +425,7 @@ public class EconomyCommand
     // Method to execute the logic for the "reset" sub-command
     private static void executeResetLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target)
     {
-        net.milkbowl.vault.economy.Economy economy = instance.getEconomy();
+        net.milkbowl.vault.economy.Economy economy = instance.getVaultEconomy();
 
         // If the target player does not have an account, return
         if (!economy.hasAccount(target))

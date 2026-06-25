@@ -21,6 +21,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.ServicePriority;
+import org.bukkit.plugin.ServicesManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
@@ -57,10 +58,10 @@ public class TheosisEconomy extends JavaPlugin
 {
 
     // Map containing snapshots of player accounts to be saved to respective JSON files on a schedule
-    private Map<UUID, PlayerAccountSnapshot> dirtyPlayerAccountSnapshots;
+    private final Map<UUID, PlayerAccountSnapshot> dirtyPlayerAccountSnapshots = new ConcurrentHashMap<>();
 
     // Scheduler for handling the repeated saving of dirty player accounts
-    private ScheduledExecutorService saveDirtyPlayerAccountsScheduler;
+    private ScheduledExecutorService saveDirtyPlayerAccountsScheduler = Executors.newSingleThreadScheduledExecutor();
 
     // File handler for the plugin's logger
     private FileHandler logFileHandler;
@@ -72,11 +73,10 @@ public class TheosisEconomy extends JavaPlugin
     private DecimalFormat decimalFormatter;
     private DecimalFormat wholeNumberFormatter;
 
-    // Instance of the Vault Economy API
-    private net.milkbowl.vault.economy.Economy economy;
-
-    // Instance of the Vault Permissions API
-    private Permission permissions;
+    // Integrations/APIs
+    private net.milkbowl.vault.economy.Economy vaultEconomy;
+    private Permission vaultPermission;
+    private MiniMessage miniMessage;
 
     // Cached names of players who have most recently been seen on the server - used for offline tab completion
     private Map<UUID, String> mostRecentPlayerNames;
@@ -85,16 +85,13 @@ public class TheosisEconomy extends JavaPlugin
     private Map<UUID, PlayerAccount> playerAccounts;
 
     // Top balances and combined total balance
-    private BalanceTop balanceTop;
+    private BalanceTop balanceTop = new BalanceTop(new LinkedHashMap<>(), BigDecimal.ZERO);
 
     // The top balances update task, so it can be cancelled in the event of a reload
     private ScheduledTask updateBalanceTopTask;
 
     // Flag to determine whether a top balances update task is running - used to prevent tasks from being able to overlap
-    private AtomicBoolean updateBalanceTopTaskRunning;
-
-    // Instance of the MiniMessage API
-    private MiniMessage miniMessage;
+    private final AtomicBoolean updateBalanceTopTaskRunning = new AtomicBoolean(false);
 
     // Instance of the LegacyComponentSerializer API
     private LegacyComponentSerializer legacyComponentSerializer;
@@ -115,12 +112,6 @@ public class TheosisEconomy extends JavaPlugin
     {
         // Set up config.yml
         saveDefaultConfig();
-
-        // Set "dirtyPlayerAccountSnapshots"
-        dirtyPlayerAccountSnapshots = new ConcurrentHashMap<>();
-
-        // Set "saveDirtyPlayerAccountsScheduler"
-        saveDirtyPlayerAccountsScheduler = Executors.newSingleThreadScheduledExecutor();
 
         // Disable console logging if config.yml says to do so
         if (!getConfig().getBoolean("settings.logging.log-console"))
@@ -146,19 +137,13 @@ public class TheosisEconomy extends JavaPlugin
         wholeNumberFormatter = new DecimalFormat("#,##0");
 
         // Register TheosisEconomy as a Vault Economy provider
-        economy = new Economy(this);
-        Bukkit.getServicesManager().register(net.milkbowl.vault.economy.Economy.class, economy, this, ServicePriority.Highest);
+        vaultEconomy = new Economy(this);
 
-        // Hook into Vault Permissions
-        permissions = getServer().getServicesManager().getRegistration(Permission.class).getProvider();
-
-        // Initial empty BalanceTop data
-        balanceTop = new BalanceTop(new LinkedHashMap<>(), BigDecimal.ZERO);
-
-        // Get instance of the MiniMessage API
+        // Set up integrations/APIs
+        ServicesManager servicesManager = getServer().getServicesManager();
+        servicesManager.register(net.milkbowl.vault.economy.Economy.class, vaultEconomy, this, ServicePriority.Highest);
+        vaultPermission = servicesManager.getRegistration(Permission.class).getProvider();
         miniMessage = MiniMessage.miniMessage();
-
-        // Get instance of the LegacyComponentSerializer API
         legacyComponentSerializer = LegacyComponentSerializer.legacySection();
 
         // Get config options from config.yml here, so they don't need to be retrieved in the async "updateBalanceTop" method later
@@ -205,9 +190,6 @@ public class TheosisEconomy extends JavaPlugin
 
         // Cache all players' UUIDs and their account data
         playerAccounts = cachePlayerAccounts();
-
-        // Set "updateBalanceTopTaskRunning"
-        updateBalanceTopTaskRunning = new AtomicBoolean(false);
 
         // Schedule repeating BalanceTop update task
         scheduleBalanceTopUpdateTask();
@@ -465,7 +447,7 @@ public class TheosisEconomy extends JavaPlugin
             {
                 OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
 
-                if (!excludedPlayers.contains(uuid) && !(balanceTopConsiderExcludePermission && permissions.playerHas(null, player, "theosiseconomy.balancetop.exclude")) && (!balanceTopExcludePermanentlyBannedPlayers || !((liteBansInstalled && Util.isPlayerLiteBansPermanentlyBanned(uuid).join()) || player.isBanned())))
+                if (!excludedPlayers.contains(uuid) && !(balanceTopConsiderExcludePermission && vaultPermission.playerHas(null, player, "theosiseconomy.balancetop.exclude")) && (!balanceTopExcludePermanentlyBannedPlayers || !((liteBansInstalled && Util.isPlayerLiteBansPermanentlyBanned(uuid).join()) || player.isBanned())))
                 {
                     PlayerAccount account = playerAccounts.get(uuid);
                     BigDecimal balance = account.getBalance();
@@ -624,10 +606,10 @@ public class TheosisEconomy extends JavaPlugin
         return wholeNumberFormatter;
     }
 
-    // Getter for "economy"
-    public net.milkbowl.vault.economy.Economy getEconomy()
+    // Getter for "vaultEconomy"
+    public net.milkbowl.vault.economy.Economy getVaultEconomy()
     {
-        return economy;
+        return vaultEconomy;
     }
 
     // Getter for "floodgateInstalled"

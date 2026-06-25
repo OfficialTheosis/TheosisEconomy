@@ -67,7 +67,7 @@ public class BalanceCommand
             target = (Player) sender;
         }
 
-        net.milkbowl.vault.economy.Economy economy = instance.getEconomy();
+        net.milkbowl.vault.economy.Economy economy = instance.getVaultEconomy();
 
         // If the target player does not have an account, return
         if (!economy.hasAccount(target))

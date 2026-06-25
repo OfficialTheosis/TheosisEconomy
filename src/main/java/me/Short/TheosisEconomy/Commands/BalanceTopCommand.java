@@ -84,7 +84,7 @@ public class BalanceTopCommand
         FileConfiguration config = instance.getConfig();
         MiniMessage miniMessage = instance.getMiniMessage();
 
-        Economy economy = instance.getEconomy();
+        Economy economy = instance.getVaultEconomy();
 
         BalanceTop balanceTop = instance.getBalanceTop();
         Map<UUID, BigDecimal> topBalances = balanceTop.getTopBalances();

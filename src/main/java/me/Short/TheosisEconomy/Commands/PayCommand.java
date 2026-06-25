@@ -141,7 +141,7 @@ public class PayCommand
             return;
         }
 
-        Economy economy = instance.getEconomy();
+        Economy economy = instance.getVaultEconomy();
 
         // If the sender does not have an account, return
         if (!economy.hasAccount(senderPlayer))
