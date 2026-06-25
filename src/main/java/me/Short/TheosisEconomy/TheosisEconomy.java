@@ -13,6 +13,7 @@ import me.Short.TheosisEconomy.Commands.PayCommand;
 import me.Short.TheosisEconomy.Commands.PayToggleCommand;
 import me.Short.TheosisEconomy.Events.BalanceTopSortEvent;
 import me.Short.TheosisEconomy.Listeners.PlayerJoinListener;
+import me.Short.TheosisEconomy.Listeners.PlayerQuitListener;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.milkbowl.vault.permission.Permission;
@@ -151,9 +152,10 @@ public class TheosisEconomy extends JavaPlugin
         balanceTopExcludePermanentlyBannedPlayers = getConfig().getBoolean("settings.balancetop.exclude-permanently-banned-players");
         balanceTopMinBalance = new BigDecimal(getConfig().getString("settings.balancetop.min-balance"));
 
-        // Register events
+        // Register event listeners
         PluginManager pluginManager = getServer().getPluginManager();
         pluginManager.registerEvents(new PlayerJoinListener(this), this);
+        pluginManager.registerEvents(new PlayerQuitListener(this), this);
 
         // Register commands
         this.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, commands ->
