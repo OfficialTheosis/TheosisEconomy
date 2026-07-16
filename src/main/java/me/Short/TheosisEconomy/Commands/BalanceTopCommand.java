@@ -36,19 +36,17 @@ public class BalanceTopCommand
     {
         return Commands.literal(commandName)
 
-                // Require permission
                 .requires(sender -> sender.getSender().hasPermission("theosiseconomy.command.balancetop"))
 
-                // Command logic if no page number was specified
+                // No page number specified, so pass 1
                 .executes(ctx ->
                 {
-                    // Execute command logic if no page number was specified
                     executeCommandLogic(instance, ctx, 1);
 
                     return Command.SINGLE_SUCCESS;
                 })
 
-                // Specified page number argument
+                // Page number argument
                 .then(Commands.argument("page number", IntegerArgumentType.integer())
 
                         // Send all valid page numbers as suggestions
@@ -65,7 +63,6 @@ public class BalanceTopCommand
                             return builder.build();
                         }))
 
-                        // Command logic if a page number was specified
                         .executes(ctx ->
                         {
                             // Execute command logic if a page number was specified

@@ -34,12 +34,11 @@ public class PayCommand
     {
         return Commands.literal(commandName)
 
-                // Require permission
                 .requires(sender -> sender.getSender().hasPermission("theosiseconomy.command.pay"))
 
+                // Send "incorrect usage" message because more arguments are required
                 .executes(ctx ->
                 {
-                    // Send the sender a message showing the command usage of this branch
                     ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
                             Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
                             Placeholder.component("argument_usage", Component.text("<player name> <amount>"))));
@@ -47,6 +46,7 @@ public class PayCommand
                     return Command.SINGLE_SUCCESS;
                 })
 
+                // Target player argument
                 .then(Commands.argument("target player", new CachedOfflinePlayerArgument(instance))
 
                         .suggests((ctx, builder) -> CompletableFuture.supplyAsync(() ->
@@ -98,9 +98,9 @@ public class PayCommand
                             return builder.build();
                         }))
 
+                        // Send "incorrect usage" message because more arguments are required
                         .executes(ctx ->
                         {
-                            // Send the sender a message showing the command usage of this branch
                             ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
                                     Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
                                     Placeholder.component("argument_usage", Component.text("<player name> <amount>"))));
@@ -108,11 +108,12 @@ public class PayCommand
                             return Command.SINGLE_SUCCESS;
                         })
 
+                        // Amount argument
                         .then(Commands.argument("amount", DoubleArgumentType.doubleArg(0D))
 
                                 .executes(ctx ->
                                 {
-                                    executeCommandLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), BigDecimal.valueOf(ctx.getArgument("amount", double.class)).stripTrailingZeros());
+                                    executeCommandLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), DoubleArgumentType.getDouble(ctx, "amount"));
 
                                     return Command.SINGLE_SUCCESS;
                                 })
@@ -121,7 +122,7 @@ public class PayCommand
     }
 
     // Method to execute the command logic
-    private static void executeCommandLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, BigDecimal amount)
+    private static void executeCommandLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, double amount)
     {
         final CommandSender sender = ctx.getSource().getSender();
 
@@ -169,8 +170,10 @@ public class PayCommand
             return;
         }
 
+        BigDecimal bdAmount = BigDecimal.valueOf(amount).stripTrailingZeros();
+
         // Call PlayerPayPlayerEvent event
-        PlayerPayPlayerEvent playerPayPlayerEvent = new PlayerPayPlayerEvent(senderPlayer, target, amount);
+        PlayerPayPlayerEvent playerPayPlayerEvent = new PlayerPayPlayerEvent(senderPlayer, target, bdAmount);
         Bukkit.getServer().getPluginManager().callEvent(playerPayPlayerEvent);
 
         // If the event is cancelled, return
@@ -182,9 +185,9 @@ public class PayCommand
         // Reassign variables in case a plugin listening for the event changed them
         senderPlayer = playerPayPlayerEvent.getSender();
         target = playerPayPlayerEvent.getRecipient();
-        amount = playerPayPlayerEvent.getAmount();
+        bdAmount = playerPayPlayerEvent.getAmount();
 
-        double amountAsDouble = amount.doubleValue(); // For passing into the Economy methods, as they only take doubles
+        double amountAsDouble = bdAmount.doubleValue();
 
         // If the sender does not have enough money to pay the amount specified, return
         if (!economy.has(senderPlayer, amountAsDouble))
@@ -206,7 +209,7 @@ public class PayCommand
             if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorTooManyDecimalPlaces()))
             {
                 senderPlayer.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.too-many-decimal-places-amount"),
-                        Placeholder.component("amount", Component.text(amount.toPlainString())),
+                        Placeholder.component("amount", Component.text(bdAmount.toPlainString())),
                         Placeholder.component("decimal_places", Component.text(economy.fractionalDigits()))));
             }
             else if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorNotGreaterThanZero()))

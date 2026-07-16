@@ -23,26 +23,22 @@ public class BalanceCommand
     {
         return Commands.literal(commandName)
 
-                // Require permission
                 .requires(sender -> sender.getSender().hasPermission("theosiseconomy.command.balance"))
 
                 .executes(ctx ->
                 {
-                    // Execute command logic if no target player was specified
                     executeCommandLogic(instance, ctx, null);
 
                     return Command.SINGLE_SUCCESS;
                 })
 
+                // Target player argument
                 .then(Commands.argument("target player", new CachedOfflinePlayerArgument(instance))
 
-                        // Require permission
                         .requires(sender -> sender.getSender().hasPermission("theosiseconomy.command.balance.others"))
 
-                        // Command logic if a target player was specified
                         .executes(ctx ->
                         {
-                            // Execute command logic
                             executeCommandLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class));
 
                             return Command.SINGLE_SUCCESS;

@@ -30,25 +30,24 @@ public class EconomyCommand
     {
         return Commands.literal(commandName)
 
-                // Require permission
                 .requires(sender -> sender.getSender().hasPermission("theosiseconomy.command.economy"))
 
+                // Send the sender a message containing information about the command
                 .executes(ctx ->
                 {
-                    // Send the sender a message containing information about the command
                     ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.economy.help")));
 
                     return Command.SINGLE_SUCCESS;
                 })
 
+                // Set sub-command
                 .then(Commands.literal("set")
 
-                        // Require permission
                         .requires(sender -> sender.getSender().hasPermission("theosiseconomy.command.economy.set"))
 
+                        // Send "incorrect usage" message because more arguments are required
                         .executes(ctx ->
                         {
-                            // Send the sender a message showing the command usage of this branch
                             ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
                                     Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
                                     Placeholder.component("argument_usage", Component.text("set <player name> <amount>"))));
@@ -56,11 +55,12 @@ public class EconomyCommand
                             return Command.SINGLE_SUCCESS;
                         })
 
+                        // Target player argument
                         .then(Commands.argument("target player", new CachedOfflinePlayerArgument(instance))
 
+                                // Send "incorrect usage" message because more arguments are required
                                 .executes(ctx ->
                                 {
-                                    // Send the sender a message showing the command usage of this branch
                                     ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
                                             Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
                                             Placeholder.component("argument_usage", Component.text("set <player name> <amount>"))));
@@ -68,11 +68,12 @@ public class EconomyCommand
                                     return Command.SINGLE_SUCCESS;
                                 })
 
+                                // Amount argument
                                 .then(Commands.argument("amount", DoubleArgumentType.doubleArg(0D))
 
                                         .executes(ctx ->
                                         {
-                                            executeSetLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), BigDecimal.valueOf(ctx.getArgument("amount", double.class)).stripTrailingZeros());
+                                            executeSetLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), DoubleArgumentType.getDouble(ctx, "amount"));
 
                                             return Command.SINGLE_SUCCESS;
                                         })
@@ -80,14 +81,14 @@ public class EconomyCommand
                         )
                 )
 
+                // Give sub-command
                 .then(Commands.literal("give")
 
-                        // Require permission
                         .requires(sender -> sender.getSender().hasPermission("theosiseconomy.command.economy.give"))
 
+                        // Send "incorrect usage" message because more arguments are required
                         .executes(ctx ->
                         {
-                            // Send the sender a message showing the command usage of this branch
                             ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
                                     Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
                                     Placeholder.component("argument_usage", Component.text("give <player name> <amount>"))));
@@ -95,11 +96,12 @@ public class EconomyCommand
                             return Command.SINGLE_SUCCESS;
                         })
 
+                        // Target player argument
                         .then(Commands.argument("target player", new CachedOfflinePlayerArgument(instance))
 
+                                // Send "incorrect usage" message because more arguments are required
                                 .executes(ctx ->
                                 {
-                                    // Send the sender a message showing the command usage of this branch
                                     ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
                                             Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
                                             Placeholder.component("argument_usage", Component.text("give <player name> <amount>"))));
@@ -107,11 +109,12 @@ public class EconomyCommand
                                     return Command.SINGLE_SUCCESS;
                                 })
 
+                                // Amount argument
                                 .then(Commands.argument("amount", DoubleArgumentType.doubleArg(0D))
 
                                         .executes(ctx ->
                                         {
-                                            executeGiveLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), BigDecimal.valueOf(ctx.getArgument("amount", double.class)).stripTrailingZeros());
+                                            executeGiveLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), DoubleArgumentType.getDouble(ctx, "amount"));
 
                                             return Command.SINGLE_SUCCESS;
                                         })
@@ -119,14 +122,14 @@ public class EconomyCommand
                         )
                 )
 
+                // Take sub-command
                 .then(Commands.literal("take")
 
-                        // Require permission
                         .requires(sender -> sender.getSender().hasPermission("theosiseconomy.command.economy.take"))
 
+                        // Send "incorrect usage" message because more arguments are required
                         .executes(ctx ->
                         {
-                            // Send the sender a message showing the command usage of this branch
                             ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
                                     Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
                                     Placeholder.component("argument_usage", Component.text("take <player name> <amount>"))));
@@ -134,11 +137,12 @@ public class EconomyCommand
                             return Command.SINGLE_SUCCESS;
                         })
 
+                        // Target player argument
                         .then(Commands.argument("target player", new CachedOfflinePlayerArgument(instance))
 
+                                // Send "incorrect usage" message because more arguments are required
                                 .executes(ctx ->
                                 {
-                                    // Send the sender a message showing the command usage of this branch
                                     ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
                                             Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
                                             Placeholder.component("argument_usage", Component.text("take <player name> <amount>"))));
@@ -146,11 +150,12 @@ public class EconomyCommand
                                     return Command.SINGLE_SUCCESS;
                                 })
 
+                                // Amount argument
                                 .then(Commands.argument("amount", DoubleArgumentType.doubleArg(0D))
 
                                         .executes(ctx ->
                                         {
-                                            executeTakeLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), BigDecimal.valueOf(ctx.getArgument("amount", double.class)).stripTrailingZeros());
+                                            executeTakeLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), DoubleArgumentType.getDouble(ctx, "amount"));
 
                                             return Command.SINGLE_SUCCESS;
                                         })
@@ -158,14 +163,14 @@ public class EconomyCommand
                         )
                 )
 
+                // Reset sub-command
                 .then(Commands.literal("reset")
 
-                        // Require permission
                         .requires(sender -> sender.getSender().hasPermission("theosiseconomy.command.economy.reset"))
 
+                        // Send "incorrect usage" message because more arguments are required
                         .executes(ctx ->
                         {
-                            // Send the sender a message showing the command usage of this branch
                             ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
                                     Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
                                     Placeholder.component("argument_usage", Component.text("reset <player name>"))));
@@ -173,6 +178,7 @@ public class EconomyCommand
                             return Command.SINGLE_SUCCESS;
                         })
 
+                        // Target player argument
                         .then(Commands.argument("target player", new CachedOfflinePlayerArgument(instance))
 
                                 .executes(ctx ->
@@ -184,9 +190,9 @@ public class EconomyCommand
                         )
                 )
 
+                // Reload sub-command
                 .then(Commands.literal("reload")
 
-                        // Require permission
                         .requires(sender -> sender.getSender().hasPermission("theosiseconomy.command.economy.reload"))
 
                         .executes(ctx ->
@@ -199,7 +205,7 @@ public class EconomyCommand
     }
 
     // Method to execute the logic for the "set" sub-command
-    private static void executeSetLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, BigDecimal amount)
+    private static void executeSetLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, double amount)
     {
         net.milkbowl.vault.economy.Economy economy = instance.getVaultEconomy();
 
@@ -212,13 +218,15 @@ public class EconomyCommand
             return;
         }
 
+        BigDecimal bdAmount = BigDecimal.valueOf(amount).stripTrailingZeros();
+
         int decimalPlaces = economy.fractionalDigits();
 
         // If the amount uses more decimal places than the configured amount, return
-        if (amount.scale() > decimalPlaces)
+        if (bdAmount.scale() > decimalPlaces)
         {
             ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.too-many-decimal-places-amount"),
-                    Placeholder.component("amount", Component.text(amount.toPlainString())),
+                    Placeholder.component("amount", Component.text(bdAmount.toPlainString())),
                     Placeholder.component("decimal_places", Component.text(decimalPlaces))));
 
             return;
@@ -227,7 +235,7 @@ public class EconomyCommand
         FileConfiguration config = instance.getConfig();
 
         // If the amount is greater than the configured maximum balance, return
-        if (amount.compareTo(new BigDecimal(config.getString("settings.currency.max-balance"))) > 0)
+        if (bdAmount.compareTo(new BigDecimal(config.getString("settings.currency.max-balance"))) > 0)
         {
             ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(config.getString("messages.error.would-exceed-max-balance"),
                     Placeholder.component("target", Component.text(target.getName()))));
@@ -241,12 +249,12 @@ public class EconomyCommand
         PlayerAccount account = instance.getPlayerAccounts().get(uuid);
 
         // Set the player's balance
-        account.setBalance(amount);
+        account.setBalance(bdAmount);
 
         // Mark for saving
         instance.getDirtyPlayerAccountSnapshots().put(uuid, account.snapshot());
 
-        String amountFormatted = economy.format(amount.doubleValue());
+        String amountFormatted = economy.format(amount);
 
         // Log the change to the console if config.yml says to do so
         if (config.getBoolean("settings.logging.balance-set.log"))
@@ -254,7 +262,7 @@ public class EconomyCommand
             instance.getLogger().log(Level.INFO, config.getString("settings.logging.balance-set.message")
                     .replace("<player>", target.getName())
                     .replace("<uuid>", uuid.toString())
-                    .replace("<amount>", amount.toPlainString()));
+                    .replace("<amount>", bdAmount.toPlainString()));
         }
 
         // Send message to the target player, if online
@@ -271,7 +279,7 @@ public class EconomyCommand
     }
 
     // Method to execute the logic for the "give" sub-command
-    private static void executeGiveLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, BigDecimal amount)
+    private static void executeGiveLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, double amount)
     {
         net.milkbowl.vault.economy.Economy economy = instance.getVaultEconomy();
 
@@ -284,20 +292,22 @@ public class EconomyCommand
             return;
         }
 
+        BigDecimal bdAmount = BigDecimal.valueOf(amount).stripTrailingZeros();
+
         int decimalPlaces = economy.fractionalDigits();
 
         // If the amount uses more decimal places than the configured amount, return
-        if (amount.scale() > decimalPlaces)
+        if (bdAmount.scale() > decimalPlaces)
         {
             ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.too-many-decimal-places-amount"),
-                    Placeholder.component("amount", Component.text(amount.toPlainString())),
+                    Placeholder.component("amount", Component.text(bdAmount.toPlainString())),
                     Placeholder.component("decimal_places", Component.text(decimalPlaces))));
 
             return;
         }
 
         // Try to deposit the amount to the target
-        EconomyResponse depositPlayerResponse = economy.depositPlayer(target, amount.doubleValue());
+        EconomyResponse depositPlayerResponse = economy.depositPlayer(target, amount);
 
         // If the deposit was unsuccessful, return
         if (!depositPlayerResponse.transactionSuccess())
@@ -312,7 +322,7 @@ public class EconomyCommand
             else if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorTooManyDecimalPlaces()))
             {
                 ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.too-many-decimal-places-amount"),
-                        Placeholder.component("amount", Component.text(amount.toPlainString())),
+                        Placeholder.component("amount", Component.text(bdAmount.toPlainString())),
                         Placeholder.component("decimal_places", Component.text(economy.fractionalDigits()))));
             }
             else if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorNotGreaterThanZero()))
@@ -346,7 +356,7 @@ public class EconomyCommand
     }
 
     // Method to execute the logic for the "take" sub-command
-    private static void executeTakeLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, BigDecimal amount)
+    private static void executeTakeLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, double amount)
     {
         net.milkbowl.vault.economy.Economy economy = instance.getVaultEconomy();
 
@@ -359,22 +369,22 @@ public class EconomyCommand
             return;
         }
 
+        BigDecimal bdAmount = BigDecimal.valueOf(amount).stripTrailingZeros();
+
         int decimalPlaces = economy.fractionalDigits();
 
         // If the amount uses more decimal places than the configured amount, return
-        if (amount.scale() > decimalPlaces)
+        if (bdAmount.scale() > decimalPlaces)
         {
             ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.too-many-decimal-places-amount"),
-                    Placeholder.component("amount", Component.text(amount.toPlainString())),
+                    Placeholder.component("amount", Component.text(bdAmount.toPlainString())),
                     Placeholder.component("decimal_places", Component.text(decimalPlaces))));
 
             return;
         }
 
-        double amountAsDouble = amount.doubleValue(); // For passing into the Economy methods, as they only take doubles
-
         // Try to withdraw the amount from the target
-        EconomyResponse withdrawPlayerResponse = economy.withdrawPlayer(target, amountAsDouble);
+        EconomyResponse withdrawPlayerResponse = economy.withdrawPlayer(target, amount);
 
         if (!withdrawPlayerResponse.transactionSuccess())
         {
@@ -384,12 +394,12 @@ public class EconomyCommand
             {
                 ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.insufficient-funds-other"),
                         Placeholder.component("target", Component.text(target.getName())),
-                        Placeholder.component("amount", Component.text(economy.format(amountAsDouble)))));
+                        Placeholder.component("amount", Component.text(economy.format(amount)))));
             }
             else if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorTooManyDecimalPlaces()))
             {
                 ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.too-many-decimal-places-amount"),
-                        Placeholder.component("amount", Component.text(amount.toPlainString())),
+                        Placeholder.component("amount", Component.text(bdAmount.toPlainString())),
                         Placeholder.component("decimal_places", Component.text(economy.fractionalDigits()))));
             }
             else if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorNotGreaterThanZero()))
