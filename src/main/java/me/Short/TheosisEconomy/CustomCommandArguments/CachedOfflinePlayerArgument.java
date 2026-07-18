@@ -28,7 +28,6 @@ import java.util.concurrent.CompletableFuture;
 public class CachedOfflinePlayerArgument implements CustomArgumentType<OfflinePlayer, PlayerSelectorArgumentResolver>
 {
 
-    // Instance of "TheosisEconomy"
     private static TheosisEconomy instance;
 
     public CachedOfflinePlayerArgument(TheosisEconomy instance)
@@ -40,7 +39,7 @@ public class CachedOfflinePlayerArgument implements CustomArgumentType<OfflinePl
 
     private static final DynamicCommandExceptionType ERROR_NOT_CACHED = new DynamicCommandExceptionType(specifiedName ->
             MessageComponentSerializer.message().serialize(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.not-joined-before"),
-                    Placeholder.component("name", Component.text(specifiedName.toString())))));
+                    Placeholder.component("name", Component.text((String) specifiedName)))));
 
     @Override
     public OfflinePlayer parse(StringReader reader)
