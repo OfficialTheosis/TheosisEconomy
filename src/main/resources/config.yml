@@ -369,6 +369,12 @@ messages:
     #      - <balance> will be replaced with the player's balance
     entry-you: "<aqua><position>.</aqua> <yellow><player></yellow> <gray><dots></gray> <yellow><balance></yellow>"
 
+    # The message sent if there are no entries
+    #      - <total> will be replaced with the total balance of the server
+    no-balancetop-entries: |-
+      <aqua>Total:</aqua> <light_purple><total></light_purple>
+      <red>There are no balances to show.</red>
+
   # Messages related to the "/pay" command
   pay:
 
@@ -382,6 +388,13 @@ messages:
     #      - <amount> will be replaced with the amount paid
     paid-sender: "<dark_aqua>Successfully paid <gold><amount></gold> to <gold><target></gold>.<dark_aqua>"
 
+    # When a player tries to pay another player who is not accepting payments
+    #      - <target> will be replaced with the target's username
+    not-accepting-payments: "<red><gold><target></gold> is not accepting payments from other players.</red>"
+
+    # When a player tries to pay themselves
+    cannot-pay-yourself: "<red>You cannot pay yourself.</red>"
+
   # Messages related to the "/paytoggle" command
   paytoggle:
 
@@ -391,7 +404,7 @@ messages:
     # When a player stops accepting payments from other players
     disabled: "<dark_aqua>You are no longer accepting payments from other players.</dark_aqua>"
 
-  # Error messages
+  # Generic error messages
   error:
 
     # When a player tries to do something they don't have permission to do
@@ -416,23 +429,6 @@ messages:
     #      - <target> will be replaced with the target's username
     no-account-other: "<red><gold><target></gold> does not have an account.</red>"
 
-    # When an invalid amount is specified (e.g. a word instead of a number)
-    #      - <amount> will be replaced with the specified amount
-    invalid-amount: "<red><gold><amount></gold> is not a valid amount.</red>"
-
-    # When a player tries to pay another player who is not accepting payments
-    #      - <target> will be replaced with the target's username
-    not-accepting-payments: "<red><gold><target></gold> is not accepting payments from other players.</red>"
-
-    # When a player tries to pay themself
-    cannot-pay-yourself: "<red>You cannot pay yourself.</red>"
-
-    # When the "/balancetop" command is used, but there are no entries
-    #      - <total> will be replaced with the total balance of the server
-    no-balancetop-entries: |-
-      <aqua>Total:</aqua> <light_purple><total></light_purple>
-      <red>There are no balances to show.</red>
-
     # When a player-targetting command is run that would result in the target's balance exceeding the server's maximum balance
     #      - <target> will be replaced with the target's username
     would-exceed-max-balance: "<red>This would result in the balance of <gold><target></gold> exceeding the maximum balance.</red>"
@@ -445,9 +441,6 @@ messages:
     #      - <target> will be replaced with the target's username
     #      - <amount> will be replaced with the specified amount
     insufficient-funds-other: "<red><gold><target></gold> does not have enough money to afford losing <gold><amount></gold>.</red>"
-
-    # When a negative amount is specified where it shouldn't be
-    negative-amount: "<red>Amount cannot be negative.</red>"
 
     # When an amount is specified that must be greater than zero, but isn't
     not-greater-than-zero-amount: "<red>Amount must be greater than zero.</red>"

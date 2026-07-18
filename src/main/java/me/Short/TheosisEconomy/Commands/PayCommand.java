@@ -137,7 +137,7 @@ public class PayCommand
         // If the target player is the sender, return, because players cannot pay themselves
         if (target == sender)
         {
-            sender.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.cannot-pay-yourself")));
+            sender.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.pay.cannot-pay-yourself")));
 
             return;
         }
@@ -164,7 +164,7 @@ public class PayCommand
         // If the target player is not accepting payments, return
         if (!instance.getPlayerAccounts().get(target.getUniqueId()).getAcceptingPayments())
         {
-            senderPlayer.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.not-accepting-payments"),
+            senderPlayer.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.pay.not-accepting-payments"),
                     Placeholder.component("target", Component.text(target.getName()))));
 
             return;
