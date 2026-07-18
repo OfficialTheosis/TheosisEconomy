@@ -124,7 +124,7 @@ public class PayCommand
     // Method to execute the command logic
     private static void executeCommandLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, double amount)
     {
-        final CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = ctx.getSource().getSender();
 
         // If the sender is not player, return, because only players can pay money
         if (!(sender instanceof Player senderPlayer))

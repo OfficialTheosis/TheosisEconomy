@@ -76,7 +76,7 @@ public class BalanceTopCommand
     // Method to execute the command logic
     private static void executeCommandLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, int pageNumber)
     {
-        final CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = ctx.getSource().getSender();
 
         FileConfiguration config = instance.getConfig();
         MiniMessage miniMessage = instance.getMiniMessage();
