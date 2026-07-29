@@ -89,7 +89,7 @@ public class BalanceTopCommand
         // If the top balances map is empty, tell the command sender, and return
         if (topBalances.isEmpty())
         {
-            sender.sendMessage(miniMessage.deserialize(config.getString("messages.error.no-balancetop-entries"),
+            sender.sendMessage(miniMessage.deserialize(config.getString("messages.balancetop.no-entries"),
                     Placeholder.component("total", Component.text(economy.format(balanceTop.getCombinedTotalBalance().doubleValue())))));
 
             return;

@@ -371,7 +371,7 @@ messages:
 
     # The message sent if there are no entries
     #      - <total> will be replaced with the total balance of the server
-    no-balancetop-entries: |-
+    no-entries: |-
       <aqua>Total:</aqua> <light_purple><total></light_purple>
       <red>There are no balances to show.</red>
 
