@@ -6,23 +6,24 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.threadedregions.scheduler.EntityScheduler;
+import me.Short.TheosisEconomy.ConfigSnapshot;
 import me.Short.TheosisEconomy.CustomCommandArguments.CachedOfflinePlayerArgument;
-import me.Short.TheosisEconomy.PlayerAccount;
+import me.Short.TheosisEconomy.MessageSender;
+import me.Short.TheosisEconomy.MessageType;
 import me.Short.TheosisEconomy.TheosisEconomy;
+import me.Short.TheosisEconomy.Util;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import net.milkbowl.vault.economy.EconomyResponse;
+import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.jspecify.annotations.NullMarked;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 import java.util.logging.Level;
 
-@NullMarked
 public class EconomyCommand
 {
 
@@ -35,7 +36,7 @@ public class EconomyCommand
                 // Send the sender a message containing information about the command
                 .executes(ctx ->
                 {
-                    ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.economy.help")));
+                    instance.getMessageSender().sendConfigMiniMessage(ctx.getSource().getSender(), MessageType.CHAT, "messages.economy.help");
 
                     return Command.SINGLE_SUCCESS;
                 })
@@ -48,9 +49,9 @@ public class EconomyCommand
                         // Send "incorrect usage" message because more arguments are required
                         .executes(ctx ->
                         {
-                            ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
+                            instance.getMessageSender().sendConfigMiniMessage(ctx.getSource().getSender(), MessageType.CHAT, "messages.error.incorrect-usage",
                                     Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
-                                    Placeholder.component("argument_usage", Component.text("set <player name> <amount>"))));
+                                    Placeholder.component("argument_usage", Component.text("set <player name> <amount>")));
 
                             return Command.SINGLE_SUCCESS;
                         })
@@ -61,9 +62,9 @@ public class EconomyCommand
                                 // Send "incorrect usage" message because more arguments are required
                                 .executes(ctx ->
                                 {
-                                    ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
+                                    instance.getMessageSender().sendConfigMiniMessage(ctx.getSource().getSender(), MessageType.CHAT, "messages.error.incorrect-usage",
                                             Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
-                                            Placeholder.component("argument_usage", Component.text("set <player name> <amount>"))));
+                                            Placeholder.component("argument_usage", Component.text("set <player name> <amount>")));
 
                                     return Command.SINGLE_SUCCESS;
                                 })
@@ -89,9 +90,9 @@ public class EconomyCommand
                         // Send "incorrect usage" message because more arguments are required
                         .executes(ctx ->
                         {
-                            ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
+                            instance.getMessageSender().sendConfigMiniMessage(ctx.getSource().getSender(), MessageType.CHAT, "messages.error.incorrect-usage",
                                     Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
-                                    Placeholder.component("argument_usage", Component.text("give <player name> <amount>"))));
+                                    Placeholder.component("argument_usage", Component.text("give <player name> <amount>")));
 
                             return Command.SINGLE_SUCCESS;
                         })
@@ -102,9 +103,9 @@ public class EconomyCommand
                                 // Send "incorrect usage" message because more arguments are required
                                 .executes(ctx ->
                                 {
-                                    ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
+                                    instance.getMessageSender().sendConfigMiniMessage(ctx.getSource().getSender(), MessageType.CHAT, "messages.error.incorrect-usage",
                                             Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
-                                            Placeholder.component("argument_usage", Component.text("give <player name> <amount>"))));
+                                            Placeholder.component("argument_usage", Component.text("give <player name> <amount>")));
 
                                     return Command.SINGLE_SUCCESS;
                                 })
@@ -130,9 +131,9 @@ public class EconomyCommand
                         // Send "incorrect usage" message because more arguments are required
                         .executes(ctx ->
                         {
-                            ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
+                            instance.getMessageSender().sendConfigMiniMessage(ctx.getSource().getSender(), MessageType.CHAT, "messages.error.incorrect-usage",
                                     Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
-                                    Placeholder.component("argument_usage", Component.text("take <player name> <amount>"))));
+                                    Placeholder.component("argument_usage", Component.text("take <player name> <amount>")));
 
                             return Command.SINGLE_SUCCESS;
                         })
@@ -143,9 +144,9 @@ public class EconomyCommand
                                 // Send "incorrect usage" message because more arguments are required
                                 .executes(ctx ->
                                 {
-                                    ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
+                                    instance.getMessageSender().sendConfigMiniMessage(ctx.getSource().getSender(), MessageType.CHAT, "messages.error.incorrect-usage",
                                             Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
-                                            Placeholder.component("argument_usage", Component.text("take <player name> <amount>"))));
+                                            Placeholder.component("argument_usage", Component.text("take <player name> <amount>")));
 
                                     return Command.SINGLE_SUCCESS;
                                 })
@@ -171,9 +172,9 @@ public class EconomyCommand
                         // Send "incorrect usage" message because more arguments are required
                         .executes(ctx ->
                         {
-                            ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.incorrect-usage"),
+                            instance.getMessageSender().sendConfigMiniMessage(ctx.getSource().getSender(), MessageType.CHAT, "messages.error.incorrect-usage",
                                     Placeholder.component("command", Component.text("/" + ctx.getInput().split("\\s+")[0])),
-                                    Placeholder.component("argument_usage", Component.text("reset <player name>"))));
+                                    Placeholder.component("argument_usage", Component.text("reset <player name>")));
 
                             return Command.SINGLE_SUCCESS;
                         })
@@ -207,317 +208,347 @@ public class EconomyCommand
     // Method to execute the logic for the "set" sub-command
     private static void executeSetLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, double amount)
     {
-        net.milkbowl.vault.economy.Economy economy = instance.getVaultEconomy();
+        CommandSender sender = ctx.getSource().getSender();
 
-        // If the target player does not have an account, return
-        if (!economy.hasAccount(target))
+        UUID targetUuid = target.getUniqueId();
+
+        EntityScheduler senderScheduler = sender instanceof Player senderPlayer ? senderPlayer.getScheduler() : null;
+
+        instance.getPlayerAccountManager().setBalance(targetUuid, BigDecimal.valueOf(amount)).whenComplete((balanceChange, throwable) ->
         {
-            ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.no-account-other"),
-                    Placeholder.component("target", Component.text(target.getName()))));
+            String targetName = target.getName();
 
-            return;
-        }
+            // If an SQL exception was thrown, log it and send a generic internal error message to the player
+            if (throwable != null)
+            {
+                instance.getLogger().log(Level.SEVERE, "Failed to set balance of " + (targetName != null ? targetName : targetUuid.toString()) + "(" + targetUuid + ").", throwable);
 
-        BigDecimal bdAmount = BigDecimal.valueOf(amount).stripTrailingZeros();
+                instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.internal");
 
-        int decimalPlaces = economy.fractionalDigits();
+                return;
+            }
 
-        // If the amount uses more decimal places than the configured amount, return
-        if (bdAmount.scale() > decimalPlaces)
-        {
-            ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.too-many-decimal-places-amount"),
-                    Placeholder.component("amount", Component.text(bdAmount.toPlainString())),
-                    Placeholder.component("decimal_places", Component.text(decimalPlaces))));
+            Runnable commandLogic = () ->
+            {
+                switch (balanceChange.result())
+                {
+                    case SUCCESS ->
+                    {
+                        ConfigSnapshot config = instance.getConfigSnapshot();
 
-            return;
-        }
+                        BigDecimal resultingBalance = balanceChange.resultingBalance();
 
-        FileConfiguration config = instance.getConfig();
+                        // Log
+                        if (config.getBoolean("settings.logging.economy-set.log"))
+                        {
+                            instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.economy-set.message")
+                                    .replace("<player>", targetName != null ? targetName : targetUuid.toString())
+                                    .replace("<uuid>", targetUuid.toString())
+                                    .replace("<balance>", resultingBalance.toPlainString()));
+                        }
 
-        // If the amount is greater than the configured maximum balance, return
-        if (bdAmount.compareTo(new BigDecimal(config.getString("settings.currency.max-balance"))) > 0)
-        {
-            ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(config.getString("messages.error.would-exceed-max-balance"),
-                    Placeholder.component("target", Component.text(target.getName()))));
+                        MessageSender messageSender = instance.getMessageSender();
 
-            return;
-        }
+                        Component resultingBalanceFormatted = Component.text(Util.formatMoney(instance, resultingBalance));
 
-        MiniMessage miniMessage = instance.getMiniMessage();
+                        // Send message to the command sender
+                        messageSender.sendConfigMiniMessage(sender, MessageType.CHAT, "messages.economy.set.balance-set-sender",
+                                Placeholder.component("target", Component.text(targetName != null ? targetName : targetUuid.toString())),
+                                Placeholder.component("amount", resultingBalanceFormatted));
 
-        UUID uuid = target.getUniqueId();
-        PlayerAccount account = instance.getPlayerAccounts().get(uuid);
+                        // Send message to the target player if online
+                        if (target instanceof Player onlineTarget)
+                        {
+                            messageSender.sendConfigMiniMessage(onlineTarget, MessageType.CHAT, "messages.economy.set.balance-set-target",
+                                    Placeholder.component("amount", resultingBalanceFormatted));
+                        }
+                    }
 
-        // Set the player's balance
-        account.setBalance(bdAmount);
+                    case ACCOUNT_NOT_FOUND -> instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.target-account-not-found",
+                            Placeholder.component("target", Component.text(targetName != null ? targetName : targetUuid.toString())));
 
-        // Mark for saving
-        instance.getDirtyPlayerAccountSnapshots().put(uuid, account.snapshot());
+                    case NEGATIVE_AMOUNT -> instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.negative-amount");
 
-        String amountFormatted = economy.format(amount);
+                    case TOO_MANY_DECIMAL_PLACES_AMOUNT -> instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.too-many-decimal-places-amount",
+                            Placeholder.component("decimal_places", Component.text(instance.getDecimalPlaces())));
 
-        // Log the change to the console if config.yml says to do so
-        if (config.getBoolean("settings.logging.balance-set.log"))
-        {
-            instance.getLogger().log(Level.INFO, config.getString("settings.logging.balance-set.message")
-                    .replace("<player>", target.getName())
-                    .replace("<uuid>", uuid.toString())
-                    .replace("<amount>", bdAmount.toPlainString()));
-        }
+                    case ABOVE_MAXIMUM_BALANCE -> instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.would-exceed-max-balance",
+                            Placeholder.component("target", Component.text(targetName != null ? targetName : targetUuid.toString())),
+                            Placeholder.component("max_balance", Component.text(Util.formatMoney(instance, BigDecimal.valueOf(instance.getConfigSnapshot().getDouble("settings.currency.max-balance"))))));
+                }
+            };
 
-        // Send message to the target player, if online
-        if (target instanceof Player)
-        {
-            ((Player) target).sendMessage(miniMessage.deserialize(config.getString("messages.economy.set.balance-set-target"),
-                    Placeholder.component("amount", Component.text(amountFormatted))));
-        }
+            Runnable fallback = () -> Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
 
-        // Send message to the command sender
-        ctx.getSource().getSender().sendMessage(miniMessage.deserialize(config.getString("messages.economy.set.balance-set-sender"),
-                Placeholder.component("target", Component.text(target.getName())),
-                Placeholder.component("amount", Component.text(amountFormatted))));
+            if (senderScheduler == null || !senderScheduler.execute(instance, commandLogic, fallback, 0L))
+            {
+                fallback.run();
+            }
+        });
     }
 
     // Method to execute the logic for the "give" sub-command
     private static void executeGiveLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, double amount)
     {
-        net.milkbowl.vault.economy.Economy economy = instance.getVaultEconomy();
+        CommandSender sender = ctx.getSource().getSender();
 
-        // If the target player does not have an account, return
-        if (!economy.hasAccount(target))
+        UUID targetUuid = target.getUniqueId();
+
+        EntityScheduler senderScheduler = sender instanceof Player senderPlayer ? senderPlayer.getScheduler() : null;
+
+        instance.getPlayerAccountManager().addToBalance(targetUuid, BigDecimal.valueOf(amount)).whenComplete((balanceChange, throwable) ->
         {
-            ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.no-account-other"),
-                    Placeholder.component("target", Component.text(target.getName()))));
+            String targetName = target.getName();
 
-            return;
-        }
-
-        BigDecimal bdAmount = BigDecimal.valueOf(amount).stripTrailingZeros();
-
-        int decimalPlaces = economy.fractionalDigits();
-
-        // If the amount uses more decimal places than the configured amount, return
-        if (bdAmount.scale() > decimalPlaces)
-        {
-            ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.too-many-decimal-places-amount"),
-                    Placeholder.component("amount", Component.text(bdAmount.toPlainString())),
-                    Placeholder.component("decimal_places", Component.text(decimalPlaces))));
-
-            return;
-        }
-
-        // Try to deposit the amount to the target
-        EconomyResponse depositPlayerResponse = economy.depositPlayer(target, amount);
-
-        // If the deposit was unsuccessful, return
-        if (!depositPlayerResponse.transactionSuccess())
-        {
-            String errorMessage = depositPlayerResponse.errorMessage;
-
-            if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorWouldExceedMaxBalance()))
+            if (throwable != null)
             {
-                ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.would-exceed-max-balance"),
-                        Placeholder.component("target", Component.text(target.getName()))));
-            }
-            else if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorTooManyDecimalPlaces()))
-            {
-                ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.too-many-decimal-places-amount"),
-                        Placeholder.component("amount", Component.text(bdAmount.toPlainString())),
-                        Placeholder.component("decimal_places", Component.text(economy.fractionalDigits()))));
-            }
-            else if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorNotGreaterThanZero()))
-            {
-                ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.not-greater-than-zero-amount")));
-            }
-            else // This should never be able to happen
-            {
-                ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize("<red>An unknown error occurred when depositing money.</red>"));
+                instance.getLogger().log(Level.SEVERE, "Failed to set balance of " + (targetName != null ? targetName : targetUuid.toString()) + "(" + targetUuid + ").", throwable);
+
+                instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.internal");
+
+                return;
             }
 
-            return;
-        }
+            Runnable commandLogic = () ->
+            {
+                switch (balanceChange.result())
+                {
+                    case SUCCESS ->
+                    {
+                        ConfigSnapshot config = instance.getConfigSnapshot();
 
-        FileConfiguration config = instance.getConfig();
-        MiniMessage miniMessage = instance.getMiniMessage();
+                        BigDecimal bdAmount = balanceChange.amount();
+                        BigDecimal resultingBalance = balanceChange.resultingBalance();
 
-        String amountFormatted = economy.format(depositPlayerResponse.amount);
+                        // Log
+                        if (config.getBoolean("settings.logging.economy-give.log"))
+                        {
+                            instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.economy-give.message")
+                                    .replace("<player>", targetName != null ? targetName : targetUuid.toString())
+                                    .replace("<uuid>", targetUuid.toString())
+                                    .replace("<amount>", bdAmount.toPlainString())
+                                    .replace("<balance>", resultingBalance.toPlainString()));
+                        }
 
-        // Send message to the target player, if online
-        if (target instanceof Player)
-        {
-            ((Player) target).sendMessage(miniMessage.deserialize(config.getString("messages.economy.give.money-given-target"),
-                    Placeholder.component("amount", Component.text(amountFormatted))));
-        }
+                        MessageSender messageSender = instance.getMessageSender();
 
-        // Send message to the command sender
-        ctx.getSource().getSender().sendMessage(miniMessage.deserialize(config.getString("messages.economy.give.money-given-sender"),
-                Placeholder.component("target", Component.text(target.getName())),
-                Placeholder.component("amount", Component.text(amountFormatted))));
+                        Component amountFormatted = Component.text(Util.formatMoney(instance, bdAmount));
+                        Component resultingBalanceFormatted = Component.text(Util.formatMoney(instance, resultingBalance));
+
+                        // Send message to the command sender
+                        messageSender.sendConfigMiniMessage(sender, MessageType.CHAT, "messages.economy.give.money-given-sender",
+                                Placeholder.component("target", Component.text(targetName != null ? targetName : targetUuid.toString())),
+                                Placeholder.component("amount", amountFormatted),
+                                Placeholder.component("balance", resultingBalanceFormatted));
+
+                        // Send message to the target player if online
+                        if (target instanceof Player onlineTarget)
+                        {
+                            messageSender.sendConfigMiniMessage(onlineTarget, MessageType.CHAT, "messages.economy.give.money-given-target",
+                                    Placeholder.component("amount", amountFormatted),
+                                    Placeholder.component("balance", resultingBalanceFormatted));
+                        }
+                    }
+
+                    case ACCOUNT_NOT_FOUND -> instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.target-account-not-found",
+                            Placeholder.component("target", Component.text(targetName != null ? targetName : targetUuid.toString())));
+
+                    case ZERO_OR_LESS_AMOUNT -> instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.zero-or-less-amount");
+
+                    case TOO_MANY_DECIMAL_PLACES_AMOUNT -> instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.too-many-decimal-places-amount",
+                            Placeholder.component("decimal_places", Component.text(instance.getDecimalPlaces())));
+
+                    case ABOVE_MAXIMUM_BALANCE -> instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.would-exceed-max-balance",
+                            Placeholder.component("target", Component.text(targetName != null ? targetName : targetUuid.toString())),
+                            Placeholder.component("max_balance", Component.text(Util.formatMoney(instance, BigDecimal.valueOf(instance.getConfigSnapshot().getDouble("settings.currency.max-balance"))))));
+                }
+            };
+
+            Runnable fallback = () -> Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
+
+            if (senderScheduler == null || !senderScheduler.execute(instance, commandLogic, fallback, 0L))
+            {
+                fallback.run();
+            }
+        });
     }
 
     // Method to execute the logic for the "take" sub-command
     private static void executeTakeLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, double amount)
     {
-        net.milkbowl.vault.economy.Economy economy = instance.getVaultEconomy();
+        CommandSender sender = ctx.getSource().getSender();
 
-        // If the target player does not have an account, return
-        if (!economy.hasAccount(target))
+        UUID targetUuid = target.getUniqueId();
+
+        EntityScheduler senderScheduler = sender instanceof Player senderPlayer ? senderPlayer.getScheduler() : null;
+
+        instance.getPlayerAccountManager().subtractFromBalance(targetUuid, BigDecimal.valueOf(amount)).whenComplete((balanceChange, throwable) ->
         {
-            ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.no-account-other"),
-                    Placeholder.component("target", Component.text(target.getName()))));
+            String targetName = target.getName();
 
-            return;
-        }
-
-        BigDecimal bdAmount = BigDecimal.valueOf(amount).stripTrailingZeros();
-
-        int decimalPlaces = economy.fractionalDigits();
-
-        // If the amount uses more decimal places than the configured amount, return
-        if (bdAmount.scale() > decimalPlaces)
-        {
-            ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.too-many-decimal-places-amount"),
-                    Placeholder.component("amount", Component.text(bdAmount.toPlainString())),
-                    Placeholder.component("decimal_places", Component.text(decimalPlaces))));
-
-            return;
-        }
-
-        // Try to withdraw the amount from the target
-        EconomyResponse withdrawPlayerResponse = economy.withdrawPlayer(target, amount);
-
-        if (!withdrawPlayerResponse.transactionSuccess())
-        {
-            String errorMessage = withdrawPlayerResponse.errorMessage;
-
-            if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorInsufficientFunds()))
+            if (throwable != null)
             {
-                ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.insufficient-funds-other"),
-                        Placeholder.component("target", Component.text(target.getName())),
-                        Placeholder.component("amount", Component.text(economy.format(amount)))));
-            }
-            else if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorTooManyDecimalPlaces()))
-            {
-                ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.too-many-decimal-places-amount"),
-                        Placeholder.component("amount", Component.text(bdAmount.toPlainString())),
-                        Placeholder.component("decimal_places", Component.text(economy.fractionalDigits()))));
-            }
-            else if (errorMessage.equals(me.Short.TheosisEconomy.Economy.getErrorNotGreaterThanZero()))
-            {
-                ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.not-greater-than-zero-amount")));
-            }
-            else // This should never be able to happen
-            {
-                ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize("<red>An unknown error occurred when withdrawing money.</red>"));
+                instance.getLogger().log(Level.SEVERE, "Failed to set balance of " + (targetName != null ? targetName : targetUuid.toString()) + "(" + targetUuid + ").", throwable);
+
+                instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.internal");
+
+                return;
             }
 
-            return;
-        }
+            Runnable commandLogic = () ->
+            {
+                switch (balanceChange.result())
+                {
+                    case SUCCESS ->
+                    {
+                        ConfigSnapshot config = instance.getConfigSnapshot();
 
-        FileConfiguration config = instance.getConfig();
-        MiniMessage miniMessage = instance.getMiniMessage();
+                        BigDecimal bdAmount = balanceChange.amount();
+                        BigDecimal resultingBalance = balanceChange.resultingBalance();
 
-        String amountFormatted = economy.format(withdrawPlayerResponse.amount);
+                        // Log
+                        if (config.getBoolean("settings.logging.economy-take.log"))
+                        {
+                            instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.economy-take.message")
+                                    .replace("<player>", targetName != null ? targetName : targetUuid.toString())
+                                    .replace("<uuid>", targetUuid.toString())
+                                    .replace("<amount>", bdAmount.toPlainString())
+                                    .replace("<balance>", resultingBalance.toPlainString()));
+                        }
 
-        // Send message to the target player, if online
-        if (target.isOnline())
-        {
-            target.getPlayer().sendMessage(miniMessage.deserialize(config.getString("messages.economy.take.money-taken-target"),
-                    Placeholder.component("amount", Component.text(amountFormatted))));
-        }
+                        MessageSender messageSender = instance.getMessageSender();
 
-        // Send message to the command sender
-        ctx.getSource().getSender().sendMessage(miniMessage.deserialize(config.getString("messages.economy.take.money-taken-sender"),
-                Placeholder.component("target", Component.text(target.getName())),
-                Placeholder.component("amount", Component.text(amountFormatted))));
+                        Component amountFormatted = Component.text(Util.formatMoney(instance, bdAmount));
+                        Component resultingBalanceFormatted = Component.text(Util.formatMoney(instance, resultingBalance));
+
+                        // Send message to the command sender
+                        messageSender.sendConfigMiniMessage(sender, MessageType.CHAT, "messages.economy.take.money-taken-sender",
+                                Placeholder.component("target", Component.text(targetName != null ? targetName : targetUuid.toString())),
+                                Placeholder.component("amount", amountFormatted),
+                                Placeholder.component("balance", resultingBalanceFormatted));
+
+                        // Send message to the target player if online
+                        if (target instanceof Player onlineTarget)
+                        {
+                            messageSender.sendConfigMiniMessage(onlineTarget, MessageType.CHAT, "messages.economy.take.money-taken-target",
+                                    Placeholder.component("amount", amountFormatted),
+                                    Placeholder.component("balance", resultingBalanceFormatted));
+                        }
+                    }
+
+                    case ACCOUNT_NOT_FOUND -> instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.target-account-not-found",
+                            Placeholder.component("target", Component.text(targetName != null ? targetName : targetUuid.toString())));
+
+                    case ZERO_OR_LESS_AMOUNT -> instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.zero-or-less-amount");
+
+                    case TOO_MANY_DECIMAL_PLACES_AMOUNT -> instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.too-many-decimal-places-amount",
+                            Placeholder.component("decimal_places", Component.text(instance.getDecimalPlaces())));
+
+                    case INSUFFICIENT_FUNDS -> instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.economy.take.insufficient-funds",
+                            Placeholder.component("target", Component.text(targetName != null ? targetName : targetUuid.toString())),
+                            Placeholder.component("amount", Component.text(Util.formatMoney(instance, balanceChange.amount()))));
+                }
+            };
+
+            Runnable fallback = () -> Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
+
+            if (senderScheduler == null || !senderScheduler.execute(instance, commandLogic, fallback, 0L))
+            {
+                fallback.run();
+            }
+        });
     }
 
     // Method to execute the logic for the "reset" sub-command
     private static void executeResetLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target)
     {
-        net.milkbowl.vault.economy.Economy economy = instance.getVaultEconomy();
+        ConfigSnapshot config = instance.getConfigSnapshot();
 
-        // If the target player does not have an account, return
-        if (!economy.hasAccount(target))
+        CommandSender sender = ctx.getSource().getSender();
+
+        UUID targetUuid = target.getUniqueId();
+
+        EntityScheduler senderScheduler = sender instanceof Player senderPlayer ? senderPlayer.getScheduler() : null;
+
+        instance.getPlayerAccountManager().setBalance(targetUuid, BigDecimal.valueOf(config.getDouble("settings.currency.default-balance"))).whenComplete((balanceChange, throwable) ->
         {
-            ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.no-account-other"),
-                    Placeholder.component("target", Component.text(target.getName()))));
+            String targetName = target.getName();
 
-            return;
-        }
+            if (throwable != null)
+            {
+                instance.getLogger().log(Level.SEVERE, "Failed to set balance of " + (targetName != null ? targetName : targetUuid.toString()) + "(" + targetUuid + ").", throwable);
 
-        BigDecimal defaultBalance = new BigDecimal(instance.getConfig().getString("settings.currency.default-balance")).stripTrailingZeros();
+                instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.internal");
 
-        // If the default balance is negative, return
-        if (defaultBalance.compareTo(BigDecimal.ZERO) < 0)
-        {
-            ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.negative-default-balance"),
-                    Placeholder.component("target", Component.text(target.getName()))));
+                return;
+            }
 
-            return;
-        }
+            Runnable commandLogic = () ->
+            {
+                switch (balanceChange.result())
+                {
+                    case SUCCESS ->
+                    {
+                        BigDecimal resultingBalance = balanceChange.resultingBalance();
 
-        // If the default balance uses more decimal places than the configured amount, return
-        if (defaultBalance.scale() > economy.fractionalDigits())
-        {
-            ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.too-many-decimal-places-default-balance"),
-                    Placeholder.component("target", Component.text(target.getName()))));
+                        // Log
+                        if (config.getBoolean("settings.logging.economy-reset.log"))
+                        {
+                            instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.economy-reset.message")
+                                    .replace("<player>", targetName != null ? targetName : targetUuid.toString())
+                                    .replace("<uuid>", targetUuid.toString())
+                                    .replace("<balance>", resultingBalance.toPlainString()));
+                        }
 
-            return;
-        }
+                        MessageSender messageSender = instance.getMessageSender();
 
-        FileConfiguration config = instance.getConfig();
+                        String resultingBalanceFormatted = Util.formatMoney(instance, resultingBalance);
 
-        // If the default balance is greater than the configured maximum balance, return
-        if (defaultBalance.compareTo(new BigDecimal(config.getString("settings.currency.max-balance"))) > 0)
-        {
-            ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(config.getString("messages.error.default-balance-exceeds-max-balance"),
-                    Placeholder.component("target", Component.text(target.getName()))));
+                        // Send message to the command sender
+                        messageSender.sendConfigMiniMessage(sender, MessageType.CHAT, "messages.economy.reset.balance-reset-sender",
+                                Placeholder.component("target", Component.text(targetName != null ? targetName : targetUuid.toString())),
+                                Placeholder.component("balance", Component.text(resultingBalanceFormatted)));
 
-            return;
-        }
+                        // Send message to the target player if online
+                        if (target instanceof Player onlineTarget)
+                        {
+                            messageSender.sendConfigMiniMessage(onlineTarget, MessageType.CHAT, "messages.economy.reset.balance-reset-target",
+                                    Placeholder.component("balance", Component.text(resultingBalanceFormatted)));
+                        }
+                    }
 
-        MiniMessage miniMessage = instance.getMiniMessage();
+                    case ACCOUNT_NOT_FOUND -> instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.target-account-not-found",
+                            Placeholder.component("target", Component.text(targetName != null ? targetName : targetUuid.toString())));
 
-        UUID uuid = target.getUniqueId();
-        PlayerAccount account = instance.getPlayerAccounts().get(uuid);
+                    case NEGATIVE_AMOUNT -> instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.economy.reset.negative-default-balance",
+                            Placeholder.component("target", Component.text(targetName != null ? targetName : targetUuid.toString())));
 
-        // Set the player's balance
-        account.setBalance(defaultBalance);
+                    case TOO_MANY_DECIMAL_PLACES_AMOUNT -> instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.economy.reset.too-many-decimal-places-default-balance",
+                            Placeholder.component("target", Component.text(targetName != null ? targetName : targetUuid.toString())));
 
-        // Mark for saving
-        instance.getDirtyPlayerAccountSnapshots().put(uuid, account.snapshot());
+                    case ABOVE_MAXIMUM_BALANCE -> instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.economy.reset.default-balance-exceeds-max-balance",
+                            Placeholder.component("target", Component.text(targetName != null ? targetName : targetUuid.toString())));
+                }
+            };
 
-        String defaultBalanceFormatted = economy.format(defaultBalance.doubleValue());
+            Runnable fallback = () -> Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
 
-        // Log the change to the console if config.yml says to do so
-        if (config.getBoolean("settings.logging.balance-reset.log"))
-        {
-            instance.getLogger().log(Level.INFO, config.getString("settings.logging.balance-reset.message")
-                    .replace("<player>", target.getName())
-                    .replace("<uuid>", uuid.toString())
-                    .replace("<default_balance>", defaultBalance.toPlainString()));
-        }
-
-        // Send message to the target player, if online
-        if (target.isOnline())
-        {
-            target.getPlayer().sendMessage(miniMessage.deserialize(config.getString("messages.economy.reset.balance-reset-target"),
-                    Placeholder.component("default_balance", Component.text(defaultBalanceFormatted))));
-        }
-
-        // Send message to the command sender
-        ctx.getSource().getSender().sendMessage(miniMessage.deserialize(config.getString("messages.economy.reset.balance-reset-sender"),
-                Placeholder.component("target", Component.text(target.getName())),
-                Placeholder.component("default_balance", Component.text(defaultBalanceFormatted))));
+            if (senderScheduler == null || !senderScheduler.execute(instance, commandLogic, fallback, 0L))
+            {
+                fallback.run();
+            }
+        });
     }
 
     // Method to execute the logic for the "reload" sub-command
     private static void executeReloadLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx)
     {
-        instance.reload();
+        Bukkit.getGlobalRegionScheduler().execute(instance, () ->
+        {
+            instance.reload();
 
-        ctx.getSource().getSender().sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.economy.reload")));
+            instance.getMessageSender().sendConfigMiniMessage(ctx.getSource().getSender(), MessageType.CHAT, "messages.economy.reload");
+        });
     }
 
 }

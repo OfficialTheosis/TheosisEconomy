@@ -14,11 +14,11 @@ import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.CustomArgumentType;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 import me.Short.TheosisEconomy.TheosisEconomy;
+import me.Short.TheosisEconomy.Util;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
-import org.geysermc.floodgate.api.FloodgateApi;
 import org.jspecify.annotations.NullMarked;
 
 import java.util.Locale;
@@ -38,7 +38,7 @@ public class CachedOfflinePlayerArgument implements CustomArgumentType<OfflinePl
     private static final SimpleCommandExceptionType ERROR_BAD_SOURCE = new SimpleCommandExceptionType(MessageComponentSerializer.message().serialize(Component.text("The source needs to be a CommandSourceStack.")));
 
     private static final DynamicCommandExceptionType ERROR_NOT_CACHED = new DynamicCommandExceptionType(specifiedName ->
-            MessageComponentSerializer.message().serialize(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.not-joined-before"),
+            MessageComponentSerializer.message().serialize(instance.getMiniMessage().deserialize(instance.getConfigSnapshot().getString("messages.error.not-joined-before"),
                     Placeholder.component("name", Component.text((String) specifiedName)))));
 
     @Override
@@ -77,26 +77,11 @@ public class CachedOfflinePlayerArgument implements CustomArgumentType<OfflinePl
     @Override
     public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder)
     {
-        if (instance.getFloodgateInstalled())
-        {
-            String remainingLowerCase = builder.getRemainingLowerCase();
-            String floodgateUsernamePrefixLowerCase = FloodgateApi.getInstance().getPlayerPrefix().toLowerCase(Locale.ROOT);
-            int floodgateUsernamePrefixLowerCaseLength = floodgateUsernamePrefixLowerCase.length();
+        String remainingLowerCase = builder.getRemainingLowerCase();
 
-            instance.getMostRecentPlayerNamesStore().getMostRecentPlayerNamesSet().stream()
-                    .filter(name ->
-                    {
-                        String nameLowerCase = name.toLowerCase(Locale.ROOT);
-                        return nameLowerCase.startsWith(remainingLowerCase) || (nameLowerCase.startsWith(floodgateUsernamePrefixLowerCase) && nameLowerCase.substring(floodgateUsernamePrefixLowerCaseLength).startsWith(remainingLowerCase));
-                    })
-                    .forEach(builder::suggest);
-        }
-        else
-        {
-            instance.getMostRecentPlayerNamesStore().getMostRecentPlayerNamesSet().stream()
-                    .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(builder.getRemainingLowerCase()))
-                    .forEach(builder::suggest);
-        }
+        instance.getMostRecentPlayerNamesStore().getMostRecentPlayerNamesSnapshot().values().stream()
+                .filter(name -> Util.nameMatchesSubstring(remainingLowerCase, name.toLowerCase(Locale.ROOT)))
+                .forEach(builder::suggest);
 
         return builder.buildFuture();
     }

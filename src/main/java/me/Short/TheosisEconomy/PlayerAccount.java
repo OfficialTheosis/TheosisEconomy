@@ -1,50 +1,72 @@
 package me.Short.TheosisEconomy;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 public class PlayerAccount
 {
 
+    private final UUID uuid;
+
     private BigDecimal balance;
+
+    private long lastBalanceChangeTimestamp;
 
     private boolean acceptingPayments;
 
-    public PlayerAccount(BigDecimal balance, boolean acceptingPayments)
+    public PlayerAccount(UUID uuid, BigDecimal balance, long lastBalanceChangeTimestamp, boolean acceptingPayments)
     {
+        this.uuid = uuid;
         this.balance = balance;
+        this.lastBalanceChangeTimestamp = lastBalanceChangeTimestamp;
         this.acceptingPayments = acceptingPayments;
     }
 
-    // Method to get a `PlayerAccountSnapshot` of this `PlayerAccount`
-    public PlayerAccountSnapshot snapshot()
+    public UUID getUuid()
     {
-        return new PlayerAccountSnapshot(balance, acceptingPayments);
+        return uuid;
     }
 
-    // ----- Getters -----
-
-    // Getter for 'balance'
-    public BigDecimal getBalance()
+    public synchronized BigDecimal getBalance()
     {
         return balance;
     }
 
-    // Getter for 'acceptingPayments'
-    public boolean getAcceptingPayments()
+    public synchronized BigDecimal addToBalance(BigDecimal amount)
     {
-        return acceptingPayments;
+        balance = balance.add(amount);
+
+        return balance;
     }
 
-    // ----- Setters -----
+    public synchronized BigDecimal subtractFromBalance(BigDecimal amount)
+    {
+        balance = balance.subtract(amount);
 
-    // Setter for "balance"
-    public void setBalance(BigDecimal balance)
+        return balance;
+    }
+
+    public synchronized void setBalance(BigDecimal balance)
     {
         this.balance = balance;
     }
 
-    // Setter for "acceptingPayments"
-    public void setAcceptingPayments(boolean acceptingPayments)
+    public synchronized long getLastBalanceChangeTimestamp()
+    {
+        return lastBalanceChangeTimestamp;
+    }
+
+    public synchronized void setLastBalanceChangeTimestamp(long lastBalanceChangeTimestamp)
+    {
+        this.lastBalanceChangeTimestamp = lastBalanceChangeTimestamp;
+    }
+
+    public synchronized boolean getAcceptingPayments()
+    {
+        return acceptingPayments;
+    }
+
+    public synchronized void setAcceptingPayments(boolean acceptingPayments)
     {
         this.acceptingPayments = acceptingPayments;
     }

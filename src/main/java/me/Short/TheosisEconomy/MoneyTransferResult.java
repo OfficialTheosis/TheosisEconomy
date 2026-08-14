@@ -1,0 +1,14 @@
+package me.Short.TheosisEconomy;
+
+public enum MoneyTransferResult
+{
+    SUCCESS,
+    SAME_ACCOUNT,
+    ZERO_OR_LESS_AMOUNT,
+    TOO_MANY_DECIMAL_PLACES_AMOUNT,
+    SENDER_NOT_FOUND,
+    TARGET_NOT_FOUND,
+    TARGET_NOT_ACCEPTING_PAYMENTS,
+    INSUFFICIENT_FUNDS,
+    ABOVE_MAXIMUM_BALANCE
+}

@@ -21,7 +21,6 @@ public class PlayerQuitListener implements Listener
     {
         Player player = event.getPlayer();
 
-        // Cache the player's username
         instance.getMostRecentPlayerNamesStore().add(player.getUniqueId(), player.getName());
     }
 

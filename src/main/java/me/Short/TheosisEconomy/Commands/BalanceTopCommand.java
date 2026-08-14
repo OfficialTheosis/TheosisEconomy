@@ -6,29 +6,25 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import me.Short.TheosisEconomy.BalanceTop;
+import io.papermc.paper.threadedregions.scheduler.EntityScheduler;
+import me.Short.TheosisEconomy.BalanceTopEntry;
+import me.Short.TheosisEconomy.ConfigSnapshot;
+import me.Short.TheosisEconomy.MessageType;
 import me.Short.TheosisEconomy.TheosisEconomy;
 import me.Short.TheosisEconomy.Util;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
-import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
-import org.jspecify.annotations.NullMarked;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
 
-@NullMarked
 public class BalanceTopCommand
 {
 
@@ -47,21 +43,7 @@ public class BalanceTopCommand
                 })
 
                 // Page number argument
-                .then(Commands.argument("page number", IntegerArgumentType.integer())
-
-                        // Send all valid page numbers as suggestions
-                        .suggests((ctx, builder) -> CompletableFuture.supplyAsync(() ->
-                        {
-                            for (int i = 1; i <= calculateBalanceTopPages(instance); i++)
-                            {
-                                if (Integer.toString(i).startsWith(builder.getRemaining()))
-                                {
-                                    builder.suggest(i);
-                                }
-                            }
-
-                            return builder.build();
-                        }))
+                .then(Commands.argument("page number", IntegerArgumentType.integer(1))
 
                         .executes(ctx ->
                         {
@@ -78,82 +60,94 @@ public class BalanceTopCommand
     {
         CommandSender sender = ctx.getSource().getSender();
 
-        FileConfiguration config = instance.getConfig();
-        MiniMessage miniMessage = instance.getMiniMessage();
+        EntityScheduler senderScheduler = sender instanceof Player senderPlayer ? senderPlayer.getScheduler() : null;
 
-        Economy economy = instance.getVaultEconomy();
-
-        BalanceTop balanceTop = instance.getBalanceTop();
-        Map<UUID, BigDecimal> topBalances = balanceTop.getTopBalances();
-
-        // If the top balances map is empty, tell the command sender, and return
-        if (topBalances.isEmpty())
+        instance.getPlayerAccountManager().getBalanceTop(pageNumber).whenComplete((balanceTopPage, throwable) ->
         {
-            sender.sendMessage(miniMessage.deserialize(config.getString("messages.balancetop.no-entries"),
-                    Placeholder.component("total", Component.text(economy.format(balanceTop.getCombinedTotalBalance().doubleValue())))));
-
-            return;
-        }
-
-        int pageLength = config.getInt("settings.balancetop.page-length");
-        int pages = calculateBalanceTopPages(instance);
-
-        // Make sure the specified page isn't below 1, and doesn't exceed the number of pages
-        if (pageNumber < 1)
-        {
-            pageNumber = 1;
-        }
-        else if (pageNumber > pages)
-        {
-            pageNumber = pages;
-        }
-
-        // Initial output (header)
-        Component output = miniMessage.deserialize(config.getString("messages.balancetop.header"),
-                Placeholder.component("page", Component.text(pageNumber)),
-                Placeholder.component("pages", Component.text(pages)),
-                Placeholder.component("total", Component.text(economy.format(balanceTop.getCombinedTotalBalance().doubleValue()))));
-
-        int startPoint = (pageNumber - 1) * pageLength;
-
-        // Append entries to the output
-        List<Map.Entry<UUID, BigDecimal>> entries = new ArrayList<>(topBalances.entrySet());
-        for (int i = startPoint; i < startPoint + pageLength && i < entries.size(); i++)
-        {
-            Map.Entry<UUID, BigDecimal> entry = entries.get(i);
-
-            OfflinePlayer player = Bukkit.getOfflinePlayer(entry.getKey());
-
-            String balanceTopEntry = config.getString(player == sender ? "messages.balancetop.entry-you" : "messages.balancetop.entry");
-
-            if (balanceTopEntry.contains("<dots>"))
+            if (throwable != null)
             {
-                output = output.appendNewline().append(miniMessage.deserialize(balanceTopEntry,
-                        Placeholder.component("position", Component.text(i + 1)),
-                        Placeholder.component("player", Component.text(player.getName())),
-                        Placeholder.component("balance", Component.text(economy.format(entry.getValue().doubleValue()))),
-                        Placeholder.component("dots", Component.text(new String(new char[Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(miniMessage.deserialize(balanceTopEntry,
-                                Placeholder.component("position", Component.text(i + 1)),
-                                Placeholder.component("player", Component.text(player.getName())),
-                                Placeholder.component("balance", Component.text(economy.format(entry.getValue().doubleValue()))))), sender instanceof Player)]).replace("\0", ".")))));
+                instance.getLogger().log(Level.SEVERE, "Failed to get top balances.", throwable);
+
+                instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.internal");
+
+                return;
             }
-            else
+
+            Runnable commandLogic = () ->
             {
-                output = output.appendNewline().append(miniMessage.deserialize(balanceTopEntry,
-                        Placeholder.component("position", Component.text(i + 1)),
-                        Placeholder.component("player", Component.text(player.getName())),
-                        Placeholder.component("balance", Component.text(economy.format(entry.getValue().doubleValue())))));
+                List<BalanceTopEntry> entries = balanceTopPage.entries();
+
+                // If there are no entries, return
+                if (entries.isEmpty())
+                {
+                    instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.balancetop.no-entries");
+
+                    return;
+                }
+
+                ConfigSnapshot config = instance.getConfigSnapshot();
+                MiniMessage miniMessage = instance.getMiniMessage();
+
+                int entriesPerPage = config.getInt("settings.balancetop.entries-per-page");
+
+                int page = balanceTopPage.page();
+
+                // Initial output (header)
+                Component output = miniMessage.deserialize(config.getString("settings.balancetop.header-format"),
+                        Placeholder.component("page", Component.text(page)));
+
+                UUID senderUuid = sender instanceof Player senderPlayer ? senderPlayer.getUniqueId() : null;
+
+                for (int i = 0; i < entries.size(); i++)
+                {
+                    BalanceTopEntry entry = entries.get(i);
+
+                    UUID entryUuid = entry.uuid();
+
+                    String playerName = Bukkit.getOfflinePlayer(entryUuid).getName();
+
+                    String entryFormat = config.getString(entryUuid.equals(senderUuid) ? "settings.balancetop.entry-format-sender" : "settings.balancetop.entry-format");
+
+                    TagResolver positionPlaceholder = Placeholder.component("position", Component.text((long) (page - 1) * entriesPerPage + i + 1));
+                    TagResolver playerPlaceholder = Placeholder.component("player", Component.text(playerName != null ? playerName : entryUuid.toString()));
+                    TagResolver balancePlaceholder = Placeholder.component("balance", Component.text(Util.formatMoney(instance, entry.balance())));
+
+                    int dotsPlaceholderIndex = entryFormat.indexOf("<dots>");
+
+                    if (dotsPlaceholderIndex != -1)
+                    {
+                        boolean forPlayer = senderUuid != null;
+
+                        output = output.appendNewline().append(miniMessage.deserialize(
+                                entryFormat,
+                                positionPlaceholder,
+                                playerPlaceholder,
+                                balancePlaceholder,
+                                Placeholder.component("dots", Component.text(".".repeat(Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(miniMessage.deserialize(entryFormat.substring(0, dotsPlaceholderIndex),
+                                        positionPlaceholder,
+                                        playerPlaceholder,
+                                        balancePlaceholder)), forPlayer, config.getInt(forPlayer ? "settings.balancetop.entry-dot-alignment-width.player" : "settings.balancetop.entry-dot-alignment-width.console")))))));
+                    }
+                    else
+                    {
+                        output = output.appendNewline().append(miniMessage.deserialize(entryFormat,
+                                positionPlaceholder,
+                                playerPlaceholder,
+                                balancePlaceholder));
+                    }
+                }
+
+                // Send output
+                instance.getMessageSender().sendMessage(sender, MessageType.CHAT, output);
+            };
+
+            Runnable fallback = () -> Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
+
+            if (senderScheduler == null || !senderScheduler.execute(instance, commandLogic, fallback, 0L))
+            {
+                fallback.run();
             }
-        }
-
-        // Send output
-        sender.sendMessage(output);
-    }
-
-    // Method to calculate the number of pages for the top balances map
-    private static int calculateBalanceTopPages(TheosisEconomy instance)
-    {
-        return (int) Math.ceil((double) instance.getBalanceTop().getTopBalances().size() / (double) instance.getConfig().getInt("settings.balancetop.page-length"));
+        });
     }
 
 }

@@ -2,16 +2,12 @@ package me.Short.TheosisEconomy.Commands;
 
 import io.papermc.paper.command.brigadier.BasicCommand;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
-import me.Short.TheosisEconomy.PlayerAccount;
+import me.Short.TheosisEconomy.MessageType;
 import me.Short.TheosisEconomy.TheosisEconomy;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-import java.util.UUID;
-
-@NullMarked
 public class PayToggleCommand implements BasicCommand
 {
 
@@ -27,47 +23,26 @@ public class PayToggleCommand implements BasicCommand
     {
         CommandSender sender = commandSourceStack.getSender();
 
-        // If the sender is not a player, return, because books can only be opened for players
+        // If the sender is not a player, return, because only players can toggle whether they want to receive payments
         if (!(sender instanceof Player player))
         {
-            sender.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.console-cannot-use")));
+            instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.console-cannot-use");
 
             return;
         }
 
-        // If the player does not have an account, return
-        if (!instance.getVaultEconomy().hasAccount((player)))
+        Boolean newAcceptingPaymentsState = instance.getPlayerAccountManager().toggleLoadedAccountAcceptingPayments(player.getUniqueId());
+
+        // If the state is somehow null, that means the sender's account is somehow not loaded, so return
+        if (newAcceptingPaymentsState == null)
         {
-            player.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.no-account")));
+            instance.getMessageSender().sendConfigMiniMessage(player, MessageType.CHAT, "messages.error.sender-account-not-found");
 
             return;
         }
 
-        UUID uuid = player.getUniqueId();
-        PlayerAccount account = instance.getPlayerAccounts().get(uuid);
-
-        if (account.getAcceptingPayments())
-        {
-            // Toggle the setting in the player's account
-            account.setAcceptingPayments(false);
-
-            // Mark for saving
-            instance.getDirtyPlayerAccountSnapshots().put(uuid, account.snapshot());
-
-            // Send message
-            player.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.paytoggle.disabled")));
-        }
-        else
-        {
-            // Toggle the setting in the player's account
-            account.setAcceptingPayments(true);
-
-            // Mark for saving
-            instance.getDirtyPlayerAccountSnapshots().put(uuid, account.snapshot());
-
-            // Send message
-            player.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.paytoggle.enabled")));
-        }
+        // Send confirmation message
+        instance.getMessageSender().sendConfigMiniMessage(player, MessageType.CHAT, newAcceptingPaymentsState ? "messages.paytoggle.enabled" : "messages.paytoggle.disabled");
     }
 
     @Override

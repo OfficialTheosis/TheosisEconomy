@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "me.Short.TheosisEconomy"
-version = "2.0.0"
+version = "2.0"
 
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(25))
@@ -41,9 +41,8 @@ repositories {
 dependencies {
     implementation("org.bstats:bstats-bukkit:3.2.1")
 
-    compileOnly("io.papermc.paper:paper-api:26.1.2.build.+")
+    compileOnly("io.papermc.paper:paper-api:26.2.build.+")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7.1")
     compileOnly("me.clip:placeholderapi:2.12.2")
     compileOnly("com.gitlab.ruany:LiteBansAPI:0.6.1")
-    compileOnly("org.geysermc.floodgate:api:2.2.5-SNAPSHOT")
 }

@@ -1,16 +1,14 @@
 package me.Short.TheosisEconomy;
 
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.apache.commons.lang3.StringUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.jetbrains.annotations.NotNull;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -33,7 +31,14 @@ public class PlaceholderAPI extends PlaceholderExpansion
     @Override
     public @NotNull String getAuthor()
     {
-        return instance.getPluginMeta().getAuthors().getFirst();
+        List<String> authors = instance.getPluginMeta().getAuthors();
+
+        if (authors.isEmpty())
+        {
+            return "";
+        }
+
+        return String.join(", ", authors);
     }
 
     @Override
@@ -59,166 +64,185 @@ public class PlaceholderAPI extends PlaceholderExpansion
                 return null;
             }
 
-            return Boolean.toString(instance.getPlayerAccounts().get(player.getUniqueId()).getAcceptingPayments());
-        }
+            Boolean acceptingPayments = instance.getPlayerAccountManager().getLoadedAccountAcceptingPayments(player.getUniqueId());
 
-        // %theosiseconomy_combined_total_balance%
-        if (params.equalsIgnoreCase("combined_total_balance"))
-        {
-            return instance.getBalanceTop().getCombinedTotalBalance().toPlainString();
-        }
+            if (acceptingPayments == null)
+            {
+                return null;
+            }
 
-        // %theosiseconomy_combined_total_balance_formatted%
-        if (params.equalsIgnoreCase("combined_total_balance_formatted"))
-        {
-            return instance.getVaultEconomy().format(instance.getBalanceTop().getCombinedTotalBalance().doubleValue());
+            return Boolean.toString(acceptingPayments);
         }
 
         // %theosiseconomy_richest_<position>_name%
-        if (Pattern.compile("richest_[1-9][0-9]*_name$", Pattern.CASE_INSENSITIVE).matcher(params).find()) // If the placeholder follows the format "richest_<number>_name"...
+        if (Pattern.compile("richest_[1-9][0-9]*_name$", Pattern.CASE_INSENSITIVE).matcher(params).find())
         {
             try
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_name", ""));
 
-                List<Map.Entry<UUID, BigDecimal>> topBalancesEntries = new ArrayList<>(instance.getBalanceTop().getTopBalances().entrySet());
+                List<BalanceTopEntry> cachedBalanceTopEntries = instance.getPlayerAccountManager().getCachedBalanceTopEntries();
 
-                if (position <= topBalancesEntries.size())
+                if (position > cachedBalanceTopEntries.size())
                 {
-                    return Bukkit.getOfflinePlayer(topBalancesEntries.get(position - 1).getKey()).getName();
+                    return instance.getConfigSnapshot().getString("settings.placeholders.balancetop-position-name-none");
                 }
 
-                return instance.getConfig().getString("settings.placeholders.balancetop-position-name-none");
+                return Bukkit.getOfflinePlayer(cachedBalanceTopEntries.get(position - 1).uuid()).getName();
             }
-            catch (NumberFormatException e)
+            catch (NumberFormatException ignored)
             {
                 return null;
             }
         }
 
         // %theosiseconomy_richest_<position>_uuid%
-        if (Pattern.compile("richest_[1-9][0-9]*_uuid$", Pattern.CASE_INSENSITIVE).matcher(params).find()) // If the placeholder follows the format "richest_<number>_uuid"...
+        if (Pattern.compile("richest_[1-9][0-9]*_uuid$", Pattern.CASE_INSENSITIVE).matcher(params).find())
         {
             try
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_uuid", ""));
 
-                List<Map.Entry<UUID, BigDecimal>> topBalancesEntries = new ArrayList<>(instance.getBalanceTop().getTopBalances().entrySet());
+                List<BalanceTopEntry> cachedBalanceTopEntries = instance.getPlayerAccountManager().getCachedBalanceTopEntries();
 
-                if (position <= topBalancesEntries.size())
+                if (position > cachedBalanceTopEntries.size())
                 {
-                    return topBalancesEntries.get(position - 1).getKey().toString();
+                    instance.getConfigSnapshot().getString("settings.placeholders.balancetop-position-uuid-none");
                 }
 
-                return instance.getConfig().getString("settings.placeholders.balancetop-position-uuid-none");
+                return cachedBalanceTopEntries.get(position - 1).uuid().toString();
             }
-            catch (NumberFormatException e)
+            catch (NumberFormatException ignored)
             {
                 return null;
             }
         }
 
         // %theosiseconomy_richest_<position>_balance%
-        if (Pattern.compile("richest_[1-9][0-9]*_balance$", Pattern.CASE_INSENSITIVE).matcher(params).find()) // If the placeholder follows the format "richest_<number>_balance"...
+        if (Pattern.compile("richest_[1-9][0-9]*_balance$", Pattern.CASE_INSENSITIVE).matcher(params).find())
         {
             try
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_balance", ""));
 
-                List<Map.Entry<UUID, BigDecimal>> topBalancesEntries = new ArrayList<>(instance.getBalanceTop().getTopBalances().entrySet());
+                List<BalanceTopEntry> cachedBalanceTopEntries = instance.getPlayerAccountManager().getCachedBalanceTopEntries();
 
-                if (position <= topBalancesEntries.size())
+                if (position > cachedBalanceTopEntries.size())
                 {
-                    return topBalancesEntries.get(position - 1).getValue().toPlainString();
+                    return instance.getConfigSnapshot().getString("settings.placeholders.balancetop-position-balance-none");
                 }
 
-                return instance.getConfig().getString("settings.placeholders.balancetop-position-balance-none");
+                return cachedBalanceTopEntries.get(position - 1).balance().toPlainString();
             }
-            catch (NumberFormatException e)
+            catch (NumberFormatException ignored)
             {
                 return null;
             }
         }
 
         // %theosiseconomy_richest_<position>_balance_formatted%
-        if (Pattern.compile("richest_[1-9][0-9]*_balance_formatted$", Pattern.CASE_INSENSITIVE).matcher(params).find()) // If the placeholder follows the format "richest_<number>_balance_formatted"...
+        if (Pattern.compile("richest_[1-9][0-9]*_balance_formatted$", Pattern.CASE_INSENSITIVE).matcher(params).find())
         {
             try
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_balance_formatted", ""));
 
-                List<Map.Entry<UUID, BigDecimal>> topBalancesEntries = new ArrayList<>(instance.getBalanceTop().getTopBalances().entrySet());
+                List<BalanceTopEntry> cachedBalanceTopEntries = instance.getPlayerAccountManager().getCachedBalanceTopEntries();
 
-                if (position <= topBalancesEntries.size())
+                if (position > cachedBalanceTopEntries.size())
                 {
-                    return instance.getVaultEconomy().format(topBalancesEntries.get(position - 1).getValue().doubleValue());
+                    return instance.getConfigSnapshot().getString("settings.placeholders.balancetop-position-balance_formatted-none");
                 }
 
-                return instance.getConfig().getString("settings.placeholders.balancetop-position-balance_formatted-none");
+                return Util.formatMoney(instance, cachedBalanceTopEntries.get(position - 1).balance());
             }
-            catch (NumberFormatException e)
+            catch (NumberFormatException ignored)
             {
                 return null;
             }
         }
 
         // %theosiseconomy_richest_<position>_entry%
-        if (Pattern.compile("richest_[1-9][0-9]*_entry$", Pattern.CASE_INSENSITIVE).matcher(params).find()) // If the placeholder follows the format "richest_<number>_entry"...
+        if (Pattern.compile("richest_[1-9][0-9]*_entry$", Pattern.CASE_INSENSITIVE).matcher(params).find())
         {
             try
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_entry", ""));
 
-                List<Map.Entry<UUID, BigDecimal>> topBalancesEntries = new ArrayList<>(instance.getBalanceTop().getTopBalances().entrySet());
+                List<BalanceTopEntry> cachedBalanceTopEntries = instance.getPlayerAccountManager().getCachedBalanceTopEntries();
 
-                if (position <= topBalancesEntries.size())
+                if (position > cachedBalanceTopEntries.size())
                 {
-                    Map.Entry<UUID, BigDecimal> topBalancesEntry = topBalancesEntries.get(position - 1);
-                    OfflinePlayer entryPlayer = Bukkit.getOfflinePlayer(topBalancesEntry.getKey());
-
-                    String entry = instance.getConfig().getString(player == entryPlayer ? "messages.balancetop.entry-you" : "messages.balancetop.entry")
-                            .replace("<position>", Integer.toString(position))
-                            .replace("<player>", entryPlayer.getName())
-                            .replace("<balance>", instance.getVaultEconomy().format(topBalancesEntry.getValue().doubleValue()));
-
-                    return entry
-                            .replace("<dots>", new String(new char[Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(instance.getMiniMessage().deserialize(entry)), true)]).replace("\0", "."));
+                    return instance.getConfigSnapshot().getString("settings.placeholders.balancetop-position-entry-none");
                 }
 
-                return instance.getConfig().getString("settings.placeholders.balancetop-position-entry-none");
+                ConfigSnapshot config = instance.getConfigSnapshot();
+
+                BalanceTopEntry entry = cachedBalanceTopEntries.get(position - 1);
+
+                UUID entryPlayerUuid = entry.uuid();
+
+                String entryPlayerName = Bukkit.getOfflinePlayer(entryPlayerUuid).getName();
+
+                String entryFormatted = config.getString(entryPlayerUuid.equals(player != null ? player.getUniqueId() : null) ? "settings.balancetop.entry-format-sender" : "settings.balancetop.entry-format")
+                        .replace("<position>", String.format("%,d", position))
+                        .replace("<player>", entryPlayerName != null ? entryPlayerName : entryPlayerUuid.toString())
+                        .replace("<balance>", Util.formatMoney(instance, entry.balance()));
+
+                int dotsPlaceholderIndex = entryFormatted.indexOf("<dots>");
+
+                if (dotsPlaceholderIndex != -1)
+                {
+                    return entryFormatted.replace("<dots>", ".".repeat(Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(instance.getMiniMessage().deserialize(entryFormatted.substring(0, dotsPlaceholderIndex))), true, config.getInt("settings.balancetop.entry-dot-alignment-width.player"))));
+                }
+
+                return entryFormatted;
             }
-            catch (NumberFormatException e)
+            catch (NumberFormatException ignored)
             {
                 return null;
             }
         }
 
         // %theosiseconomy_richest_<position>_entry_legacy%
-        if (Pattern.compile("richest_[1-9][0-9]*_entry_legacy$", Pattern.CASE_INSENSITIVE).matcher(params).find()) // If the placeholder follows the format "richest_<number>_entry_legacy"...
+        if (Pattern.compile("richest_[1-9][0-9]*_entry_legacy$", Pattern.CASE_INSENSITIVE).matcher(params).find())
         {
             try
             {
                 int position = Integer.parseInt(StringUtils.replaceOnceIgnoreCase(StringUtils.replaceOnceIgnoreCase(params, "richest_", ""), "_entry_legacy", ""));
 
-                List<Map.Entry<UUID, BigDecimal>> topBalancesEntries = new ArrayList<>(instance.getBalanceTop().getTopBalances().entrySet());
+                List<BalanceTopEntry> cachedBalanceTopEntries = instance.getPlayerAccountManager().getCachedBalanceTopEntries();
 
-                if (position <= topBalancesEntries.size())
+                if (position > cachedBalanceTopEntries.size())
                 {
-                    Map.Entry<UUID, BigDecimal> topBalancesEntry = topBalancesEntries.get(position - 1);
-                    OfflinePlayer entryPlayer = Bukkit.getOfflinePlayer(topBalancesEntry.getKey());
-
-                    String entry = instance.getConfig().getString(player == entryPlayer ? "messages.balancetop.entry-you" : "messages.balancetop.entry")
-                            .replace("<position>", Integer.toString(position))
-                            .replace("<player>", entryPlayer.getName())
-                            .replace("<balance>", instance.getVaultEconomy().format(topBalancesEntry.getValue().doubleValue()));
-
-                    return instance.getLegacyComponentSerializer().serialize(instance.getMiniMessage().deserialize(entry
-                            .replace("<dots>", new String(new char[Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(instance.getMiniMessage().deserialize(entry)), true)]).replace("\0", "."))));
+                    return instance.getConfigSnapshot().getString("settings.placeholders.balancetop-position-entry-legacy-none");
                 }
 
-                return instance.getConfig().getString("settings.placeholders.balancetop-position-entry-legacy-none");
+                ConfigSnapshot config = instance.getConfigSnapshot();
+
+                BalanceTopEntry entry = cachedBalanceTopEntries.get(position - 1);
+
+                UUID entryPlayerUuid = entry.uuid();
+
+                String entryPlayerName = Bukkit.getOfflinePlayer(entryPlayerUuid).getName();
+
+                String entryFormatted = config.getString(entryPlayerUuid.equals(player != null ? player.getUniqueId() : null) ? "settings.balancetop.entry-format-sender" : "settings.balancetop.entry-format")
+                        .replace("<position>", String.format("%,d", position))
+                        .replace("<player>", entryPlayerName != null ? entryPlayerName : entryPlayerUuid.toString())
+                        .replace("<balance>", Util.formatMoney(instance, entry.balance()));
+
+                int dotsPlaceholderIndex = entryFormatted.indexOf("<dots>");
+
+                if (dotsPlaceholderIndex != -1)
+                {
+                    MiniMessage miniMessage = instance.getMiniMessage();
+
+                    return instance.getLegacyComponentSerializer().serialize(miniMessage.deserialize(entryFormatted.replace("<dots>", ".".repeat(Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(miniMessage.deserialize(entryFormatted.substring(0, dotsPlaceholderIndex))), true, config.getInt("settings.balancetop.entry-dot-alignment-width.player"))))));
+                }
+
+                return instance.getLegacyComponentSerializer().serialize(instance.getMiniMessage().deserialize(entryFormatted));
             }
-            catch (NumberFormatException e)
+            catch (NumberFormatException ignored)
             {
                 return null;
             }

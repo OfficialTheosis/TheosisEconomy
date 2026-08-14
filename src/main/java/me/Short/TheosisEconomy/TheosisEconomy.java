@@ -1,8 +1,5 @@
 package me.Short.TheosisEconomy;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonIOException;
 import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
@@ -11,7 +8,8 @@ import me.Short.TheosisEconomy.Commands.BalanceTopCommand;
 import me.Short.TheosisEconomy.Commands.EconomyCommand;
 import me.Short.TheosisEconomy.Commands.PayCommand;
 import me.Short.TheosisEconomy.Commands.PayToggleCommand;
-import me.Short.TheosisEconomy.Events.BalanceTopSortEvent;
+import me.Short.TheosisEconomy.Listeners.AsyncPlayerPreLoginListener;
+import me.Short.TheosisEconomy.Listeners.PlayerConnectionCloseListener;
 import me.Short.TheosisEconomy.Listeners.PlayerJoinListener;
 import me.Short.TheosisEconomy.Listeners.PlayerQuitListener;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -19,145 +17,171 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.milkbowl.vault.permission.Permission;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.ServicesManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
-import java.io.Writer;
-import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.text.DecimalFormat;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.sql.SQLException;
 import java.util.logging.FileHandler;
-import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class TheosisEconomy extends JavaPlugin
 {
 
-    // Map containing snapshots of player accounts to be saved to respective JSON files on a schedule
-    private final Map<UUID, PlayerAccountSnapshot> dirtyPlayerAccountSnapshots = new ConcurrentHashMap<>();
+    // The name of the file that the activity logger will write to if configured to do so
+    public static final String ACTIVITY_LOGGER_FILE_NAME = "logs.log";
 
-    // Scheduler for handling the repeated saving of dirty player accounts
-    private ScheduledExecutorService saveDirtyPlayerAccountsScheduler = Executors.newSingleThreadScheduledExecutor();
+    // Immutable config snapshot to allow config values to be safely read from different threads
+    private volatile ConfigSnapshot configSnapshot;
 
-    // File handler for the plugin's logger
-    private FileHandler logFileHandler;
+    // Database manager
+    private DatabaseManager databaseManager;
 
-    // Instance of the Gson library
-    private Gson gson;
+    // Player account manager
+    private PlayerAccountManager playerAccountManager;
 
-    // Decimal formatters
-    private DecimalFormat decimalFormatter;
-    private DecimalFormat wholeNumberFormatter;
+    // Used to easily send messages to audiences' chat/action bars using the appropriate scheduler
+    private final MessageSender messageSender = new MessageSender(this);
+
+    // Logger for monetary activity
+    private final Logger activityLogger = Logger.getLogger(getName() + "-Activity");
+
+    // File handler for the activity logger
+    private FileHandler activityLoggerFileHandler;
 
     // Integrations/APIs
-    private net.milkbowl.vault.economy.Economy vaultEconomy;
+    private Economy vaultEconomy;
     private Permission vaultPermission;
     private MiniMessage miniMessage;
 
     // Cached names of players who have most recently been seen on the server - used for offline tab completion
     private MostRecentPlayerNamesStore mostRecentPlayerNamesStore;
 
-    // Cache of all player accounts
-    private Map<UUID, PlayerAccount> playerAccounts;
-
-    // Top balances and combined total balance
-    private volatile BalanceTop balanceTop = new BalanceTop(new LinkedHashMap<>(), BigDecimal.ZERO);
-
-    // The top balances update task, so it can be cancelled in the event of a reload
-    private ScheduledTask updateBalanceTopTask;
-
-    // Flag to determine whether a top balances update task is running - used to prevent tasks from being able to overlap
-    private final AtomicBoolean updateBalanceTopTaskRunning = new AtomicBoolean(false);
+    // Task that repeatedly refreshes the BalanceTop cache
+    private ScheduledTask balanceTopCacheRefreshTask;
 
     // Instance of the LegacyComponentSerializer API
     private LegacyComponentSerializer legacyComponentSerializer;
 
-    // Whether LiteBans is installed - for checking in the "updateBalanceTop" method
+    // The number of decimal places that the currency is configured to use
+    private int decimalPlaces;
+
+    // PlaceholderAPI
+    private PlaceholderAPI placeholderApi;
+
+    // Whether LiteBans is installed - checked when filtering BalanceTop entries
     private boolean liteBansInstalled;
-
-    // Whether Floodgate is installed - for excluding Floodgate player prefixes in tab completion
-    private boolean floodgateInstalled;
-
-    // Config options that may need to be retrieved in the "updateBalanceTop" method later
-    private boolean balanceTopConsiderExcludePermission;
-    private boolean balanceTopExcludePermanentlyBannedPlayers;
-    private BigDecimal balanceTopMinBalance;
 
     @Override
     public void onEnable()
     {
-        // Set up config.yml
+        // Save default config file if it doesn't already exist
         saveDefaultConfig();
 
-        // Disable console logging if config.yml says to do so
-        if (!getConfig().getBoolean("settings.logging.log-console"))
+        // Create immutable snapshot of config
+        configSnapshot = ConfigSnapshot.create(getConfig());
+
+        // Set "decimalPlaces"
+        decimalPlaces = configSnapshot.getInt("settings.currency.decimal-places");
+        if (decimalPlaces < 0)
         {
-            getLogger().setUseParentHandlers(false);
+            getLogger().log(Level.SEVERE, "The configured number of decimal places is negative.");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
         }
 
-        // Enable file logging to "logs.log" if config.yml says to do so
-        if (getConfig().getBoolean("settings.logging.log-file"))
+        // Set up database manager and establish database connection
+        databaseManager = new DatabaseManager(this, getDataFolder().toPath().resolve("database.db").toString());
+        try
         {
-            logFileHandler = setupLogFileHandler();
+            databaseManager.connect();
         }
-        else
+        catch (ClassNotFoundException e)
         {
-            logFileHandler = null;
+            getLogger().log(Level.SEVERE, "Error invoking Class#forName(String) on the JDBC driver.", e);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+        catch (SQLException e)
+        {
+            getLogger().log(Level.SEVERE, "Error establishing connection to the database.", e);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
         }
 
-        // Create instance of Gson
-        gson = new GsonBuilder().create();
+        // Create database tables if they don't already exist
+        try
+        {
+            databaseManager.createTables();
+        }
+        catch (SQLException e)
+        {
+            getLogger().log(Level.SEVERE, "Error creating database tables.", e);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
 
-        // Set decimal formatters
-        decimalFormatter = new DecimalFormat("#,##0." + "0".repeat(getConfig().getInt("settings.currency.decimal-places")));
-        wholeNumberFormatter = new DecimalFormat("#,##0");
+        // Make sure all balances in the database are using the configured number of decimal places
+        try
+        {
+            databaseManager.prepareBalanceRescale(decimalPlaces);
+        }
+        catch (SQLException e)
+        {
+            getLogger().log(Level.SEVERE, "Error preparing the database balance scale.", e);
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
 
-        // Register TheosisEconomy as a Vault Economy provider
-        vaultEconomy = new Economy(this);
+        // Set up player account manager
+        playerAccountManager = new PlayerAccountManager(this, databaseManager);
 
-        // Set up integrations/APIs
         ServicesManager servicesManager = getServer().getServicesManager();
+
+        // Register this plugin as a Vault economy provider
+        vaultEconomy = new Economy(this);
         servicesManager.register(net.milkbowl.vault.economy.Economy.class, vaultEconomy, this, ServicePriority.Highest);
+
+        // Set up integration/APIs
         vaultPermission = servicesManager.getRegistration(Permission.class).getProvider();
         miniMessage = MiniMessage.miniMessage();
         legacyComponentSerializer = LegacyComponentSerializer.legacySection();
 
-        // Set "mostRecentPlayerNamesStore"
-        mostRecentPlayerNamesStore = new MostRecentPlayerNamesStore(this, getDataFolder().toPath().resolve("most-recent-player-names.json"), getConfig().getInt("settings.misc.most-recent-player-names-cache-max-size"));
+        PluginManager pluginManager = getServer().getPluginManager();
 
-        // Get config options from config.yml here, so they don't need to be retrieved in the async "updateBalanceTop" method later
-        balanceTopConsiderExcludePermission = getConfig().getBoolean("settings.balancetop.consider-exclude-permission");
-        balanceTopExcludePermanentlyBannedPlayers = getConfig().getBoolean("settings.balancetop.exclude-permanently-banned-players");
-        balanceTopMinBalance = new BigDecimal(getConfig().getString("settings.balancetop.min-balance"));
+        // Register PlaceholderAPI
+        if (pluginManager.getPlugin("PlaceholderAPI") != null)
+        {
+            placeholderApi = new PlaceholderAPI(this);
+            placeholderApi.register();
+        }
+
+        // Get whether LiteBans is installed
+        liteBansInstalled = pluginManager.getPlugin("LiteBans") != null;
+
+        // Set up activity logger
+        activityLogger.setParent(getLogger());
+        activityLogger.setUseParentHandlers(configSnapshot.getBoolean("settings.logging.log-console"));
+        if (configSnapshot.getBoolean("settings.logging.log-file"))
+        {
+            activityLoggerFileHandler = setupActivityLoggerFileHandler(ACTIVITY_LOGGER_FILE_NAME);
+        }
+
+        // Schedule BalanceTop cache refresh task
+        balanceTopCacheRefreshTask = scheduleBalanceTopCacheRefreshTask();
+
+        // Set "mostRecentPlayerNamesStore"
+        mostRecentPlayerNamesStore = new MostRecentPlayerNamesStore(this, databaseManager, configSnapshot.getInt("settings.misc.most-recent-player-names-cache-max-size"));
 
         // Register event listeners
-        PluginManager pluginManager = getServer().getPluginManager();
         pluginManager.registerEvents(new PlayerJoinListener(this), this);
         pluginManager.registerEvents(new PlayerQuitListener(this), this);
+        pluginManager.registerEvents(new AsyncPlayerPreLoginListener(this), this);
+        pluginManager.registerEvents(new PlayerConnectionCloseListener(this), this);
 
         // Register commands
         this.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, commands ->
@@ -165,431 +189,164 @@ public class TheosisEconomy extends JavaPlugin
             Commands registrar = commands.registrar();
 
             // Basic commands
-            registrar.register(getConfig().getString("settings.commands.paytoggle.name"), getConfig().getString("settings.commands.paytoggle.description"), getConfig().getStringList("settings.commands.paytoggle.aliases"), new PayToggleCommand(this));
+            registrar.register(configSnapshot.getString("settings.commands.paytoggle.name"), configSnapshot.getString("settings.commands.paytoggle.description"), configSnapshot.getStringList("settings.commands.paytoggle.aliases"), new PayToggleCommand(this));
 
             // Non-basic commands
-            registrar.register(BalanceCommand.createCommand(getConfig().getString("settings.commands.balance.name"), this), getConfig().getString("settings.commands.balance.description"), getConfig().getStringList("settings.commands.balance.aliases"));
-            registrar.register(BalanceTopCommand.createCommand(getConfig().getString("settings.commands.balancetop.name"), this), getConfig().getString("settings.commands.balancetop.description"), getConfig().getStringList("settings.commands.balancetop.aliases"));
-            registrar.register(PayCommand.createCommand(getConfig().getString("settings.commands.pay.name"), this), getConfig().getString("settings.commands.pay.description"), getConfig().getStringList("settings.commands.pay.aliases"));
-            registrar.register(EconomyCommand.createCommand(getConfig().getString("settings.commands.economy.name"), this), getConfig().getString("settings.commands.economy.description"), getConfig().getStringList("settings.commands.economy.aliases"));
+            registrar.register(BalanceCommand.createCommand(configSnapshot.getString("settings.commands.balance.name"), this), configSnapshot.getString("settings.commands.balance.description"), configSnapshot.getStringList("settings.commands.balance.aliases"));
+            registrar.register(BalanceTopCommand.createCommand(configSnapshot.getString("settings.commands.balancetop.name"), this), configSnapshot.getString("settings.commands.balancetop.description"), configSnapshot.getStringList("settings.commands.balancetop.aliases"));
+            registrar.register(PayCommand.createCommand(configSnapshot.getString("settings.commands.pay.name"), this), configSnapshot.getString("settings.commands.pay.description"), configSnapshot.getStringList("settings.commands.pay.aliases"));
+            registrar.register(EconomyCommand.createCommand(configSnapshot.getString("settings.commands.economy.name"), this), configSnapshot.getString("settings.commands.economy.description"), configSnapshot.getStringList("settings.commands.economy.aliases"));
         });
-
-        // Register PlaceholderAPI placeholders, if PlaceholderAPI is installed
-        if (pluginManager.getPlugin("PlaceholderAPI") != null)
-        {
-            new PlaceholderAPI(this).register();
-        }
-
-        // Get whether LiteBans is installed
-        liteBansInstalled = pluginManager.getPlugin("LiteBans") != null;
-
-        // Get whether Floodgate is installed
-        floodgateInstalled = pluginManager.getPlugin("floodgate") != null;
 
         // bStats
         Metrics metrics = new Metrics(this, 13836);
-
-        // Cache all players' UUIDs and their account data
-        playerAccounts = cachePlayerAccounts();
-
-        // Schedule repeating BalanceTop update task
-        scheduleBalanceTopUpdateTask();
-
-        // Schedule task to periodically save any dirty player accounts to JSON files
-        runSaveDirtyPlayerAccountsLoop();
     }
 
     @Override
     public void onDisable()
     {
-        // Shut down the save dirty player accounts scheduler, allowing the current task (if there is one running) to finish
-        saveDirtyPlayerAccountsScheduler.shutdown();
-
-        // Allow currently running task to finish, or force shutdown if it hasn't after 30 seconds (it should never take this long)
-        try
+        // Cancel the BalanceTop cache refresh task
+        if (balanceTopCacheRefreshTask != null)
         {
-            if (!saveDirtyPlayerAccountsScheduler.awaitTermination(30, TimeUnit.SECONDS))
-            {
-                saveDirtyPlayerAccountsScheduler.shutdownNow();
-            }
-        }
-        catch (InterruptedException ignored)
-        {
-            saveDirtyPlayerAccountsScheduler.shutdownNow();
-            Thread.currentThread().interrupt();
+            balanceTopCacheRefreshTask.cancel();
         }
 
-        // Shut down and save the most recent player names
-        mostRecentPlayerNamesStore.shutdownAndSave();
-
-        // Ensure any remaining dirty player accounts are saved
-        saveDirtyPlayerAccounts();
-    }
-
-    // Method to set up "logFileHandler" and set it to this plugin's logger
-    private FileHandler setupLogFileHandler()
-    {
-        try
+        // Prevent further PlayerAccountManager work and shut down its BalanceTop filter executor
+        if (playerAccountManager != null)
         {
-            FileHandler logFileHandler = new FileHandler(getDataFolder().getAbsolutePath() + File.separator + "logs.log", true);
-            logFileHandler.setFormatter(new LogFormatter());
-            getLogger().addHandler(logFileHandler);
-
-            return logFileHandler;
-        }
-        catch (IOException e)
-        {
-            throw new RuntimeException(e);
-        }
-    }
-
-    // Method to cache all player accounts from their respective JSON files in the "player-accounts" folder
-    private Map<UUID, PlayerAccount> cachePlayerAccounts()
-    {
-        Map<UUID, PlayerAccount> playerAccounts = new ConcurrentHashMap<>();
-
-        File playerAccountsFolder = new File(getDataFolder(), "player-accounts");
-
-        // If a "player-accounts" folder doesn't exist, create one
-        if (!playerAccountsFolder.exists())
-        {
-            playerAccountsFolder.mkdirs();
+            playerAccountManager.shutdownExecutor();
         }
 
-        // Get a list of player account files
-        File[] playerAccountFiles = playerAccountsFolder.listFiles();
-
-        // If there are no files, return the unpopulated `playerAccounts` map
-        if (playerAccountFiles == null)
+        // Disconnect from the database, allowing current work to finish first
+        if (databaseManager != null)
         {
-            return playerAccounts;
-        }
-
-        // Go through each file, read a `PlayerAccount` object from it, and put it in `PlayerAccounts`
-        for (File file : playerAccountFiles)
-        {
-            try
-            {
-                UUID uuid = UUID.fromString(file.getName().replace(".json", ""));
-
-                try (FileReader reader = new FileReader(file))
-                {
-                    playerAccounts.put(uuid, gson.fromJson(reader, PlayerAccount.class));
-                }
-            }
-            catch (IllegalArgumentException e)
-            {
-                getLogger().log(Level.WARNING, "Failed to load player account - invalid UUID in file name: " + file.getName(), e);
-            }
-            catch (IOException | JsonIOException e)
-            {
-                getLogger().log(Level.WARNING, "Failed to load player account - failed to read file: " + file.getName(), e);
-            }
-        }
-
-        return playerAccounts;
-    }
-
-    // Method to schedule a repeating BalanceTop update task
-    private void scheduleBalanceTopUpdateTask()
-    {
-        updateBalanceTopTask = Bukkit.getGlobalRegionScheduler().runAtFixedRate(this, task ->
-        {
-            // Don't update BalanceTop if a task is already running
-            if (!updateBalanceTopTaskRunning.compareAndSet(false, true))
-            {
-                return;
-            }
-
-            // Create BalanceTopSortEvent instance with an initial empty HashSet of excluded players' UUIDs
-            BalanceTopSortEvent balanceTopSortEvent = new BalanceTopSortEvent(new HashSet<>());
-
-            // Call the event
-            Bukkit.getServer().getPluginManager().callEvent(balanceTopSortEvent);
-
-            // If the event was cancelled, return
-            if (balanceTopSortEvent.isCancelled())
-            {
-                updateBalanceTopTaskRunning.set(false);
-
-                return;
-            }
-
-            // Call "updateBalanceTop", passing in the HashSet of excluded players' UUIDs
-            updateBalanceTop(balanceTopSortEvent.getExcludedPlayers()).whenComplete((balanceTop, throwable) ->
-            {
-                if (throwable == null)
-                {
-                    this.balanceTop = balanceTop;
-                }
-                else
-                {
-                    throwable.printStackTrace();
-                }
-
-                updateBalanceTopTaskRunning.set(false);
-            });
-        }, 1L, getConfig().getLong("settings.balancetop.update-task-frequency"));
-    }
-
-    // Method to repeatedly call `saveDirtyPlayerAccounts()` async
-    private void runSaveDirtyPlayerAccountsLoop()
-    {
-        saveDirtyPlayerAccountsScheduler.scheduleWithFixedDelay(this::saveDirtyPlayerAccounts, 0, getConfig().getLong("settings.misc.data-file-save-frequency"), TimeUnit.SECONDS);
-    }
-
-    // Method to save all player accounts in `dirtyPlayerAccountSnapshots` to respective JSON files, and remove the saved accounts from `dirtyPlayerAccountSnapshots` after
-    private void saveDirtyPlayerAccounts()
-    {
-        // If there are no dirty player account snapshots, return
-        if (dirtyPlayerAccountSnapshots.isEmpty())
-        {
-            return;
-        }
-
-        // Save each dirty player account to a JSON file inside the "player-accounts" folder
-        for (Map.Entry<UUID, PlayerAccountSnapshot> entry : new HashMap<>(dirtyPlayerAccountSnapshots).entrySet())
-        {
-            UUID uuid = entry.getKey();
-            PlayerAccountSnapshot playerAccountSnapshot = entry.getValue();
-
-            Path target = getDataFolder().toPath()
-                    .resolve("player-accounts")
-                    .resolve(uuid + ".json");
-
-            Path temp = target.resolveSibling(target.getFileName() + ".tmp");
+            databaseManager.shutdownExecutor();
 
             try
             {
-                // Write the snapshot to a temporary file
-                try (Writer writer = Files.newBufferedWriter(temp, StandardCharsets.UTF_8))
-                {
-                    gson.toJson(playerAccountSnapshot, writer);
-                }
-
-                // Atomically move the temporary file to the real JSON file
-                try
-                {
-                    Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-                }
-                catch (AtomicMoveNotSupportedException ignored)
-                {
-                    Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
-                }
-
-                // Remove the snapshot from `dirtyPlayerAccountSnapshots` - only remove if same instance
-                dirtyPlayerAccountSnapshots.remove(uuid, playerAccountSnapshot);
+                databaseManager.disconnect();
             }
-            catch (IOException e)
+            catch (SQLException e)
             {
-                getLogger().log(Level.WARNING, "Failed to save player account to file: " + target, e);
+                getLogger().log(Level.SEVERE, "Error closing connection to the database.", e);
             }
         }
-    }
 
-    // Method to create and return a new BalanceTop
-    private CompletableFuture<BalanceTop> updateBalanceTop(Set<UUID> excludedPlayers)
-    {
-        return CompletableFuture.supplyAsync(() ->
+        // Un-register this plugin as a Vault economy provider
+        getServer().getServicesManager().unregister(net.milkbowl.vault.economy.Economy.class, vaultEconomy);
+
+        // Un-register PlaceholderAPI
+        if (placeholderApi != null)
         {
-            Map<UUID, BigDecimal> unsortedBalances = new HashMap<>();
-            BigDecimal total = BigDecimal.ZERO;
+            placeholderApi.unregister();
+        }
 
-            // Get player names and their balances in no particular order, excluding banned players if config.yml says to not include them - the `Bukkit.getOfflinePlayer(uuid).isBanned()` is the only thing here that might not be safe to run async, but no issues so far in testing
-            for (UUID uuid : playerAccounts.keySet())
-            {
-                OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
-
-                if (!excludedPlayers.contains(uuid) && !(balanceTopConsiderExcludePermission && vaultPermission.playerHas(null, player, "theosiseconomy.balancetop.exclude")) && (!balanceTopExcludePermanentlyBannedPlayers || !((liteBansInstalled && Util.isPlayerLiteBansPermanentlyBanned(uuid).join()) || player.isBanned())))
-                {
-                    PlayerAccount account = playerAccounts.get(uuid);
-                    BigDecimal balance = account.getBalance();
-
-                    total = total.add(balance);
-
-                    if (balance.compareTo(balanceTopMinBalance) >= 0)
-                    {
-                        unsortedBalances.put(uuid, balance);
-                    }
-                }
-            }
-
-            // Create and return sorted version of "unsortedBalances"
-            LinkedHashMap<UUID, BigDecimal> topBalances = new LinkedHashMap<>();
-            unsortedBalances.entrySet().stream()
-                    .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
-                    .forEach(entry -> topBalances.put(entry.getKey(), entry.getValue()));
-
-            return new BalanceTop(topBalances, total);
-        });
+        // Close activity logger file handler
+        if (activityLoggerFileHandler != null)
+        {
+            activityLogger.removeHandler(activityLoggerFileHandler);
+            activityLoggerFileHandler.close();
+            activityLoggerFileHandler = null;
+        }
     }
 
     // Method to reload the config and data files
     public void reload()
     {
-        // Reload config.yml from disk
+        // Reload config
         reloadConfig();
 
-        // Re-get values from config that were retrieved in "onEnable"
-        balanceTopConsiderExcludePermission = getConfig().getBoolean("settings.balancetop.consider-exclude-permission");
-        balanceTopExcludePermanentlyBannedPlayers = getConfig().getBoolean("settings.balancetop.exclude-permanently-banned-players");
-        balanceTopMinBalance = new BigDecimal(getConfig().getString("settings.balancetop.min-balance"));
+        // Create immutable snapshot of config
+        configSnapshot = ConfigSnapshot.create(getConfig());
 
-        // Set whether to send logs to console
-        Logger logger = getLogger();
-        if (getConfig().getBoolean("settings.logging.log-console"))
+        // Set whether the activity logger should send logs to the console
+        activityLogger.setUseParentHandlers(configSnapshot.getBoolean("settings.logging.log-console"));
+
+        // Set whether the activity logger should send logs to the "logs.log" file
+        if (configSnapshot.getBoolean("settings.logging.log-file"))
         {
-            if (!logger.getUseParentHandlers())
+            if (activityLoggerFileHandler == null)
             {
-                logger.setUseParentHandlers(true);
+                activityLoggerFileHandler = setupActivityLoggerFileHandler(ACTIVITY_LOGGER_FILE_NAME);
             }
         }
         else
         {
-            if (logger.getUseParentHandlers())
+            // Remove the FileHandler from the activity logger
+            if (activityLoggerFileHandler != null)
             {
-                logger.setUseParentHandlers(false);
+                activityLogger.removeHandler(activityLoggerFileHandler);
+                activityLoggerFileHandler.close();
+                activityLoggerFileHandler = null;
             }
         }
 
-        // Set whether to send logs to the "logs.log" file
-        if (getConfig().getBoolean("settings.logging.log-file"))
-        {
-            if (logFileHandler != null)
-            {
-                boolean loggerContainsFileHandler = false;
+        // Cancel and re-schedule the BalanceTop cache refresh task
+        balanceTopCacheRefreshTask.cancel();
+        balanceTopCacheRefreshTask = scheduleBalanceTopCacheRefreshTask();
 
-                for (Handler handler : logger.getHandlers())
-                {
-                    if (handler == logFileHandler)
-                    {
-                        loggerContainsFileHandler = true;
-                        break;
-                    }
-                }
+        // Update most recent player names store limit
+        mostRecentPlayerNamesStore.setLimit(configSnapshot.getInt("settings.misc.most-recent-player-names-cache-max-size"));
+    }
 
-                if (!loggerContainsFileHandler)
-                {
-                    logger.addHandler(logFileHandler);
-                }
-            }
-            else
-            {
-                logFileHandler = setupLogFileHandler();
-            }
-        }
-        else
-        {
-            // Remove the FileHandler from the logger, if it exists
-            if (logFileHandler != null)
-            {
-                for (Handler handler : logger.getHandlers())
-                {
-                    if (handler == logFileHandler)
-                    {
-                        logger.removeHandler(logFileHandler);
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Shut down the save dirty player accounts scheduler, allowing the current task (if there is one running) to finish
-        saveDirtyPlayerAccountsScheduler.shutdown();
-
-        // Allow currently running task to finish, or force shutdown if it hasn't after 30 seconds (it should never take this long)
+    // Set up file handler for the activity logger
+    private FileHandler setupActivityLoggerFileHandler(String fileName)
+    {
         try
         {
-            if (!saveDirtyPlayerAccountsScheduler.awaitTermination(30, TimeUnit.SECONDS))
-            {
-                saveDirtyPlayerAccountsScheduler.shutdownNow();
-            }
+            FileHandler activityLoggerFileHandler = new FileHandler(getDataFolder().getAbsolutePath() + File.separator + fileName, true);
+            activityLoggerFileHandler.setFormatter(new ActivityLogFormatter());
+            activityLogger.addHandler(activityLoggerFileHandler);
+
+            return activityLoggerFileHandler;
         }
-        catch (InterruptedException ignored)
+        catch (IOException e)
         {
-            saveDirtyPlayerAccountsScheduler.shutdownNow();
-            Thread.currentThread().interrupt();
+            getLogger().log(Level.SEVERE, "Error setting up file handler for the activity logger. Logs will not be saved to a file in this session.", e);
+
+            return null;
         }
-
-        // Ensure any remaining dirty player accounts are saved
-        saveDirtyPlayerAccounts();
-
-        // Re-set "saveDirtyPlayerAccountsScheduler"
-        saveDirtyPlayerAccountsScheduler = Executors.newSingleThreadScheduledExecutor();
-
-        // Re-schedule repeating data save task
-        runSaveDirtyPlayerAccountsLoop();
-
-        // Shut down and save the most recent player names
-        mostRecentPlayerNamesStore.shutdownAndSave();
-
-        // Re-set "mostRecentPlayerNamesStore"
-        mostRecentPlayerNamesStore = new MostRecentPlayerNamesStore(this, getDataFolder().toPath().resolve("most-recent-player-names.json"), getConfig().getInt("settings.misc.most-recent-player-names-cache-max-size"));
-
-        // Re-set "decimalFormatter", since the number of decimal places the currency is configured to use may have changed
-        decimalFormatter = new DecimalFormat("#,##0." + "0".repeat(getConfig().getInt("settings.currency.decimal-places")));
-
-        // Re-cache player accounts
-        playerAccounts = cachePlayerAccounts();
-
-        // Cancel the current repeating BalanceTop update task
-        updateBalanceTopTask.cancel();
-
-        // Re-set "updateBalanceTopTaskRunning"
-        updateBalanceTopTaskRunning.set(false);
-
-        // Re-schedule repeating BalanceTop update task
-        scheduleBalanceTopUpdateTask();
     }
 
-    // ----- Getters -----
-
-    // Getter for "dirtyPlayerAccountSnapshots"
-    public Map<UUID, PlayerAccountSnapshot> getDirtyPlayerAccountSnapshots()
+    // Method to schedule BalanceTop refresh cache task
+    private ScheduledTask scheduleBalanceTopCacheRefreshTask()
     {
-        return dirtyPlayerAccountSnapshots;
+        return Bukkit.getGlobalRegionScheduler().runAtFixedRate(this, scheduledTask ->
+                playerAccountManager.refreshCachedBalanceTopEntries().exceptionally(throwable ->
+                {
+                    getLogger().log(Level.WARNING, "Failed to refresh cached BalanceTop entries.", throwable);
+                    return null;
+                }), 1L, configSnapshot.getLong("settings.placeholders.balancetop-cache.refresh-interval") * 20L);
     }
 
-    // Getter for "gson"
-    public Gson getGson()
+    // Getter for "configSnapshot"
+    public ConfigSnapshot getConfigSnapshot()
     {
-        return gson;
+        return configSnapshot;
     }
 
-    // Getter for "decimalFormatter"
-    public DecimalFormat getDecimalFormatter()
+    // Getter for "playerAccountManager"
+    public PlayerAccountManager getPlayerAccountManager()
     {
-        return decimalFormatter;
+        return playerAccountManager;
     }
 
-    // Getter for "wholeNumberFormatter"
-    public DecimalFormat getWholeNumberFormatter()
+    // Getter for "messageSender"
+    public MessageSender getMessageSender()
     {
-        return wholeNumberFormatter;
+        return messageSender;
     }
 
-    // Getter for "vaultEconomy"
-    public net.milkbowl.vault.economy.Economy getVaultEconomy()
+    // Getter for "activityLogger"
+    public Logger getActivityLogger()
     {
-        return vaultEconomy;
+        return activityLogger;
     }
 
-    // Getter for "floodgateInstalled"
-    public boolean getFloodgateInstalled()
+    // Getter for "vaultPermission"
+    public Permission getVaultPermission()
     {
-        return floodgateInstalled;
-    }
-
-    // Getter for "playerAccounts"
-    public Map<UUID, PlayerAccount> getPlayerAccounts()
-    {
-        return playerAccounts;
-    }
-
-    // Getter for "balanceTop"
-    public BalanceTop getBalanceTop()
-    {
-        return balanceTop;
+        return vaultPermission;
     }
 
     // Getter for "miniMessage"
@@ -602,6 +359,18 @@ public class TheosisEconomy extends JavaPlugin
     public LegacyComponentSerializer getLegacyComponentSerializer()
     {
         return legacyComponentSerializer;
+    }
+
+    // Getter for "decimalPlaces"
+    public int getDecimalPlaces()
+    {
+        return decimalPlaces;
+    }
+
+    // Getter for "liteBansInstalled"
+    public boolean getLiteBansInstalled()
+    {
+        return liteBansInstalled;
     }
 
     // Getter for "mostRecentPlayerNamesStore"

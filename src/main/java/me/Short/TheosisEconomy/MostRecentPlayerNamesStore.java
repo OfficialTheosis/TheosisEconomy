@@ -1,206 +1,225 @@
 package me.Short.TheosisEconomy;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.Writer;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.LinkedHashMap;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CompletionException;
 import java.util.logging.Level;
 
 public class MostRecentPlayerNamesStore
 {
 
-    private final LinkedHashMap<UUID, String> mostRecentPlayerNamesMap = new LinkedHashMap<>();
-
-    private volatile LinkedHashMap<UUID, String> latestSnapshot = new LinkedHashMap<>();
-
-    private final ExecutorService saveExecutor = Executors.newSingleThreadExecutor();
-
-    private final AtomicBoolean saving = new AtomicBoolean(false);
-    private final AtomicBoolean saveAgain = new AtomicBoolean(false);
-
     private final TheosisEconomy instance;
-    private final Path file;
-    private final int limit;
+    private final DatabaseManager databaseManager;
 
-    private final Gson gson;
+    private int limit;
 
-    private volatile Set<String> mostRecentPlayerNamesSet = Set.of();
+    private final LinkedHashMap<UUID, String> mostRecentPlayerNames = new LinkedHashMap<>();
 
-    public MostRecentPlayerNamesStore(TheosisEconomy instance, Path file, int limit)
+    private volatile Map<UUID, String> mostRecentPlayerNamesSnapshot = Map.of();
+
+    private long mostRecentTimestamp;
+
+    public MostRecentPlayerNamesStore(TheosisEconomy instance, DatabaseManager databaseManager, int limit)
     {
         this.instance = instance;
-        this.file = file;
-        this.limit = limit;
-
-        this.gson = instance.getGson();
+        this.databaseManager = databaseManager;
+        this.limit = Math.max(0, limit);
 
         load();
     }
 
-    // Method to add a player to the map, causing the oldest ones to get removed if it exceeds the limit
-    public void add(UUID uuid, String value)
+    // Add a player to the map, causing the oldest one to get removed if it exceeds the limit
+    public synchronized void add(UUID uuid, String username)
     {
-        mostRecentPlayerNamesMap.remove(uuid);
-        mostRecentPlayerNamesMap.put(uuid, value);
+        // Ensure every update has a strictly increasing timestamp, even if multiple updates happen in the same millisecond
+        long timestamp = Math.max(System.currentTimeMillis(), mostRecentTimestamp + 1);
 
-        trimToLimit();
-    }
+        mostRecentTimestamp = timestamp;
 
-    // Method to get a snapshot of the map
-    private LinkedHashMap<UUID, String> snapshot()
-    {
-        return new LinkedHashMap<>(mostRecentPlayerNamesMap);
-    }
+        mostRecentPlayerNames.remove(uuid);
+        mostRecentPlayerNames.put(uuid, username);
 
-    // Method to load the map from the JSON file
-    private void load()
-    {
-        if (Files.notExists(file))
+        UUID removedUuid = null;
+
+        if (mostRecentPlayerNames.size() > limit)
         {
-            return;
+            removedUuid = mostRecentPlayerNames.keySet().iterator().next();
+            mostRecentPlayerNames.remove(removedUuid);
         }
 
-        try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8))
-        {
-            LinkedHashMap<UUID, String> loaded = gson.fromJson(reader, new TypeToken<LinkedHashMap<UUID, String>>() {}.getType());
+        updateSnapshot();
 
-            if (loaded != null)
-            {
-                mostRecentPlayerNamesMap.clear();
-                mostRecentPlayerNamesMap.putAll(loaded);
+        UUID finalRemovedUuid = removedUuid;
 
-                trimToLimit();
-            }
-        }
-        catch (IOException e)
-        {
-            instance.getLogger().log(Level.WARNING, "Failed to load most recent player names.", e);
-        }
-    }
-
-    // Method to request the map to be saved to the JSON file
-    private void requestSave()
-    {
-        latestSnapshot = snapshot();
-
-        saveAgain.set(true);
-
-        if (!saving.compareAndSet(false, true))
-        {
-            return;
-        }
-
-        saveExecutor.submit(() ->
+        databaseManager.executeTask(() ->
         {
             try
             {
-                do
-                {
-                    saveAgain.set(false);
+                upsertPlayerNameInDatabase(uuid, username, timestamp);
 
-                    saveSnapshot(latestSnapshot);
+                if (finalRemovedUuid != null)
+                {
+                    deletePlayerNameFromDatabase(finalRemovedUuid);
                 }
-                while (saveAgain.get());
             }
-            finally
+            catch (SQLException e)
             {
-                saving.set(false);
-
-                if (saveAgain.get())
-                {
-                    requestSave();
-                }
+                instance.getLogger().log(Level.WARNING, "Failed to save most recent player name.", e);
             }
         });
     }
 
-    // Method to save a snapshot of the map to the JSON file
-    private void saveSnapshot(LinkedHashMap<UUID, String> snapshot)
+    // Load the most recent player names from the database
+    private void load()
     {
-        Path temp = file.resolveSibling(file.getFileName() + ".tmp");
-
         try
         {
-            // Write the snapshot to a temporary file
-            try (Writer writer = Files.newBufferedWriter(temp, StandardCharsets.UTF_8))
+            databaseManager.submitTask(() ->
             {
-                gson.toJson(snapshot, writer);
-            }
+                try
+                {
+                    trimDatabaseToLimit(limit);
 
-            // Atomically move the temporary file to the real JSON file
+                    String sql = """
+                        SELECT uuid, username, last_seen_timestamp
+                        FROM most_recent_player_names
+                        ORDER BY last_seen_timestamp ASC, uuid DESC;
+                        """;
+
+                    try (PreparedStatement statement = databaseManager.getConnection().prepareStatement(sql);
+                         ResultSet resultSet = statement.executeQuery())
+                    {
+                        mostRecentPlayerNames.clear();
+
+                        while (resultSet.next())
+                        {
+                            UUID uuid = UUID.fromString(resultSet.getString("uuid"));
+
+                            mostRecentPlayerNames.put(uuid, resultSet.getString("username"));
+
+                            mostRecentTimestamp = Math.max(mostRecentTimestamp, resultSet.getLong("last_seen_timestamp"));
+                        }
+                    }
+
+                    updateSnapshot();
+
+                    return null;
+                }
+                catch (SQLException e)
+                {
+                    throw new CompletionException(e);
+                }
+            }).join();
+        }
+        catch (CompletionException e)
+        {
+            instance.getLogger().log(Level.WARNING, "Failed to load most recent player names from the database.", e.getCause() != null ? e.getCause() : e);
+        }
+    }
+
+    // Insert or update a player's cached username
+    private void upsertPlayerNameInDatabase(UUID uuid, String username, long timestamp) throws SQLException
+    {
+        String sql = """
+            INSERT INTO most_recent_player_names (
+                uuid,
+                username,
+                last_seen_timestamp
+            )
+            VALUES (?, ?, ?)
+            ON CONFLICT(uuid)
+            DO UPDATE SET
+                username = excluded.username,
+                last_seen_timestamp = excluded.last_seen_timestamp;
+            """;
+
+        try (PreparedStatement statement = databaseManager.getConnection().prepareStatement(sql))
+        {
+            statement.setString(1, uuid.toString());
+            statement.setString(2, username);
+            statement.setLong(3, timestamp);
+
+            statement.executeUpdate();
+        }
+    }
+
+    // Remove an evicted player name from the database
+    private void deletePlayerNameFromDatabase(UUID uuid) throws SQLException
+    {
+        String sql = """
+            DELETE FROM most_recent_player_names
+            WHERE uuid = ?;
+            """;
+
+        try (PreparedStatement statement = databaseManager.getConnection().prepareStatement(sql))
+        {
+            statement.setString(1, uuid.toString());
+
+            statement.executeUpdate();
+        }
+    }
+
+    // Trim the database down to the configured limit
+    private void trimDatabaseToLimit(int limit) throws SQLException
+    {
+        String sql = """
+            DELETE FROM most_recent_player_names
+            WHERE uuid NOT IN (
+                SELECT uuid
+                FROM most_recent_player_names
+                ORDER BY last_seen_timestamp DESC, uuid ASC
+                LIMIT ?
+            );
+            """;
+
+        try (PreparedStatement statement = databaseManager.getConnection().prepareStatement(sql))
+        {
+            statement.setInt(1, limit);
+
+            statement.executeUpdate();
+        }
+    }
+
+    // Update the snapshot of the most recent player names map
+    private void updateSnapshot()
+    {
+        mostRecentPlayerNamesSnapshot = Map.copyOf(mostRecentPlayerNames);
+    }
+
+    // Getter for "mostRecentPlayerNamesSnapshot"
+    public Map<UUID, String> getMostRecentPlayerNamesSnapshot()
+    {
+        return mostRecentPlayerNamesSnapshot;
+    }
+
+    public synchronized void setLimit(int limit)
+    {
+        limit = Math.max(0, limit);
+        this.limit = limit;
+
+        while (mostRecentPlayerNames.size() > limit)
+        {
+            mostRecentPlayerNames.remove(mostRecentPlayerNames.keySet().iterator().next());
+        }
+
+        updateSnapshot();
+
+        int finalLimit = limit;
+        databaseManager.executeTask(() ->
+        {
             try
             {
-                Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                trimDatabaseToLimit(finalLimit);
             }
-            catch (AtomicMoveNotSupportedException ignored)
+            catch (SQLException e)
             {
-                Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING);
+                instance.getLogger().log(Level.WARNING, "Failed to trim most recent player names.", e);
             }
-        }
-        catch (IOException e)
-        {
-            instance.getLogger().log(Level.WARNING, "Failed to save most recent player names.", e);
-        }
-    }
-
-    // Method to trim the map down to its limit
-    private void trimToLimit()
-    {
-        while (mostRecentPlayerNamesMap.size() > limit)
-        {
-            mostRecentPlayerNamesMap.remove(mostRecentPlayerNamesMap.keySet().iterator().next());
-        }
-
-        updateSet();
-
-        requestSave();
-    }
-
-    // Method to update the set of player names with the values from the map
-    private void updateSet()
-    {
-        mostRecentPlayerNamesSet = Set.copyOf(mostRecentPlayerNamesMap.values());
-    }
-
-    // Method to shut down the executor service and save the map to the JSON file
-    public void shutdownAndSave()
-    {
-        requestSave();
-
-        saveExecutor.shutdown();
-
-        try
-        {
-            if (!saveExecutor.awaitTermination(30, TimeUnit.SECONDS))
-            {
-                saveExecutor.shutdownNow();
-            }
-        }
-        catch (InterruptedException e)
-        {
-            saveExecutor.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    // Getter for "mostRecentPlayerNamesSet"
-    public Set<String> getMostRecentPlayerNamesSet()
-    {
-        return mostRecentPlayerNamesSet;
+        });
     }
 
 }

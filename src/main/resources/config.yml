@@ -23,6 +23,8 @@ settings:
     max-balance: 10000000000000.00
 
     # The number of decimal places you want your currency to use
+    #      - A server restart is required for changes to this value to take effect
+    #      - Reducing this will permanently truncate the precision of all existing balances in the database that use more decimal places than what you reduce it to
     # Default: 2
     decimal-places: 2
 
@@ -35,27 +37,23 @@ settings:
     name-plural: "pounds"
 
     # The format in which your currency will be displayed
-    #      - <amount> will be replaced with the amount of money
+    #      - <amount> will be replaced with the amount of money with comma-separation
     #      - <name> will be replaced with your currency name
     # Default: "£<amount> <name>"
     format: "£<amount> <name>"
 
     # What type of rounding should occur when an amount of money uses more decimal places than what the currency is configured to use
     #      - Valid values are NONE, ROUND_NEAREST, ROUND_UP, and ROUND_DOWN
-    #      - If set to NONE, no rounding will occur, and the amount will not be accepted
+    #      - If set to NONE, no rounding will occur, and the operation will be rejected
     # Default: NONE
     rounding-mode: NONE
 
   # Settings related to the "/balancetop" command
   balancetop:
 
-    # How often you want the top balances to be updated, in ticks (20 ticks = 1 second, 300 ticks = 15 seconds)
-    # Default: 300
-    update-task-frequency: 300
-
     # The number of entries displayed per page
     # Default: 10
-    page-length: 10
+    entries-per-page: 10
 
     # The minimum balance a player must have to be shown
     # Default: 0.01
@@ -70,7 +68,33 @@ settings:
     # Default: false
     exclude-permanently-banned-players: false
 
+    # The header format
+    #      - <page> will be replaced with the current page
+    header-format: "<gray>----------(<green>Top Balances (Page: <gold><page></gold>)</green>)----------</gray>"
+
+    # What each entry will look like
+    #      - <position> will be replaced with the player's leaderboard position
+    #      - <player> will be replaced with the player's username
+    #      - <dots> will be replaced with the number of dots required to align the content of the entry after the placeholder with that of other entries
+    #      - <balance> will be replaced with the player's balance
+    entry-format: "<dark_aqua><position>.</dark_aqua> <gold><player></gold> <dark_gray><dots></dark_gray> <gold><balance></gold>"
+
+    # What the entry representing the command sender will look like
+    #      - <position> will be replaced with the player's leaderboard position
+    #      - <player> will be replaced with the player's username
+    #      - <dots> will be replaced with the number of dots required to align the content of the entry after the placeholder with that of other entries
+    #      - <balance> will be replaced with the player's balance
+    entry-format-sender: "<aqua><position>.</aqua> <yellow><player></yellow> <gray><dots></gray> <yellow><balance></yellow>"
+
+    # The width that the end of the <dots> placeholder should be aligned to
+    #      - Player width is measured in Minecraft font pixels
+    #      - Console width is measured in number of characters
+    entry-dot-alignment-width:
+      player: 130
+      console: 40
+
   # Settings related to commands
+  #      - A server restart is required for changes to these to take effect
   commands:
 
     # The "/balance" command
@@ -116,6 +140,12 @@ settings:
   # Settings related to PlaceholderAPI placeholders
   placeholders:
 
+    # How many BalanceTop entries should be kept in memory, allowing them to be retrieved with placeholders
+    #      - For example, if you want the placeholder %theosiseconomy_richest_7_name% to work, you must cache at least 7 entries
+    balancetop-cache:
+      entries: 10
+      refresh-interval: 30
+
     # What the %theosiseconomy_richest_<position>_name% placeholder will be replaced with if there is no player in the specified position on "/balancetop"
     balancetop-position-name-none: "N/A"
 
@@ -134,8 +164,7 @@ settings:
     # What the %theosiseconomy_richest_<position>_entry_legacy% placeholder will be replaced with if there is no player in the specified position on "/balancetop"
     balancetop-position-entry-legacy-none: ""
 
-  # Settings related to the logging of important things that TheosisEconomy does
-  #      - Log messages do not support colour codes; they should just be plain strings
+  # Settings related to the logging of monetary activity
   logging:
 
     # Whether logs should be sent to the console
@@ -144,8 +173,8 @@ settings:
     # Whether logs should be saved to a file named "logs.log"
     log-file: true
 
-    # When TheosisEconomy successfully creates an account for a player (this happens when they join the server, and don't already have an account)
-    account-creation-success:
+    # When TheosisEconomy creates an account for a player (this happens when they join the server, and don't already have an account)
+    account-create:
 
       # Whether to log this
       # Default: true
@@ -154,23 +183,27 @@ settings:
       # The log message
       #       - <player> will be replaced with the player's username
       #       - <uuid> will be replaced with the player's UUID
-      #       - <default_balance> will be replaced with the configured default balance
-      message: "Created account for <player> (<uuid>) with a default balance of <default_balance>."
+      message: "Created account for <player> (<uuid>)."
 
-    # When TheosisEconomy tries to create an account for a player, but fails because either the default balance is negative, uses more decimal places than what the currency is configured to use, or exceeds the configured maximum balance
-    account-creation-fail:
+    # When "/pay <player> <amount>" is used to pay another player
+    pay:
 
       # Whether to log this
       # Default: true
       log: true
 
       # The log message
-      #       - <player> will be replaced with the player's username
-      #       - <uuid> will be replaced with the player's UUID
-      message: "Failed to create account for <player> (<uuid>). This is because either the default balance is negative, uses more decimal places than what the currency is configured to use, or exceeds the configured maximum balance."
+      #       - <sender> will be replaced with the sender's username
+      #       - <sender_uuid> will be replaced with the sender's UUID
+      #       - <target> will be replaced with the target's username
+      #       - <target_uuid> will be replaced with the target's UUID
+      #       - <amount> will be replaced with the amount paid
+      #       - <sender_balance> will be replaced with the sender's resulting balance
+      #       - <target_balance> will be replaced with the target's resulting balance
+      message: "<sender> (<sender_uuid>) paid <amount> to <target> (<target_uuid>). <sender>'s balance is now <sender_balance>, and <target>'s balance is now <target_balance>."
 
     # When "/economy set <player> <amount>" is used to set a player's balance
-    balance-set:
+    economy-set:
 
       # Whether to log this
       # Default: true
@@ -179,11 +212,39 @@ settings:
       # The log message
       #       - <player> will be replaced with the player's username
       #       - <uuid> will be replaced with the player's UUID
-      #       - <amount> will be replaced with the amount set
-      message: "Set <player>'s (<uuid>) balance to <amount>."
+      #       - <balance> will be replaced with the player's resulting balance
+      message: "Set <player>'s (<uuid>) balance to <balance>."
+
+    # When "/economy give <player> <amount>" is used to add money to a player's balance
+    economy-give:
+
+      # Whether to log this
+      # Default: true
+      log: true
+
+      # The log message
+      #       - <player> will be replaced with the player's username
+      #       - <uuid> will be replaced with the player's UUID
+      #       - <amount> will be replaced with the amount given
+      #       - <balance> will be replaced with the player's resulting balance
+      message: "Gave <amount> to <player> (<uuid>). They now have <balance>."
+
+    # When "/economy take <player> <amount>" is used to subtract money from a player's balance
+    economy-take:
+
+      # Whether to log this
+      # Default: true
+      log: true
+
+      # The log message
+      #       - <player> will be replaced with the player's username
+      #       - <uuid> will be replaced with the player's UUID
+      #       - <amount> will be replaced with the amount taken
+      #       - <balance> will be replaced with the player's resulting balance
+      message: "Took <amount> from <player> (<uuid>). They now have <balance>."
 
     # When "/economy reset <player>" is used to reset a player's balance to default
-    balance-reset:
+    economy-reset:
 
       # Whether to log this
       # Default: true
@@ -192,10 +253,10 @@ settings:
       # The log message
       #       - <player> will be replaced with the player's username
       #       - <uuid> will be replaced with the player's UUID
-      #       - <default_balance> will be replaced with the configured default balance
-      message: "Reset <player>'s (<uuid>) balance to the default balance (<default_balance>)."
+      #       - <balance> will be replaced with the configured default balance
+      message: "Reset <player>'s (<uuid>) balance to the default balance (<balance>)."
 
-    # When a plugin tells TheosisEconomy to withdraw money from a player's balance, and the operation is successful
+    # When a plugin tells TheosisEconomy to withdraw money from a player's balance via Vault, and the operation is successful
     vault-withdraw-success:
 
       # Whether to log this
@@ -207,9 +268,9 @@ settings:
       #       - <uuid> will be replaced with the player's UUID
       #       - <amount> will be replaced with the amount withdrawn
       #       - <balance> will be replaced with the player's resulting balance
-      message: "Withdrew <amount> from <player>'s (<uuid>) balance. They now have <balance>."
+      message: "(Vault) Withdrew <amount> from <player>'s (<uuid>) balance. They now have <balance>."
 
-    # When a plugin tells TheosisEconomy to withdraw money from a player's balance, but the operation fails because either the player does not have sufficient funds, the amount uses more decimal places than what the currency is configured to use, or is negative
+    # When a plugin tells TheosisEconomy to withdraw money from a player's balance via Vault, but the operation fails
     vault-withdraw-fail:
 
       # Whether to log this
@@ -221,9 +282,9 @@ settings:
       #       - <uuid> will be replaced with the player's UUID
       #       - <amount> will be replaced with the amount attempted to be withdrawn
       #       - <error_message> will be replaced with the error message
-      message: "Failed to withdraw <amount> from <player>'s (<uuid>) balance. Error message: <error_message>"
+      message: "(Vault) Failed to withdraw <amount> from <player>'s (<uuid>) balance. Error message: <error_message>"
 
-    # When a plugin tells TheosisEconomy to deposit money to a player's balance, and the operation is successful
+    # When a plugin tells TheosisEconomy to deposit money to a player's balance via Vault, and the operation is successful
     vault-deposit-success:
 
       # Whether to log this
@@ -235,9 +296,9 @@ settings:
       #       - <uuid> will be replaced with the player's UUID
       #       - <amount> will be replaced with the amount deposited
       #       - <balance> will be replaced with the player's resulting balance
-      message: "Deposited <amount> to <player>'s (<uuid>) balance. They now have <balance>."
+      message: "(Vault) Deposited <amount> to <player>'s (<uuid>) balance. They now have <balance>."
 
-    # When a plugin tells TheosisEconomy to deposit money to a player's balance, but the operation fails because either it would result in the player's balance exceeding the configured maximum, the amount uses more decimal places than what the currency is configured to use, or is negative
+    # When a plugin tells TheosisEconomy to deposit money to a player's balance via Vault, but the operation fails
     vault-deposit-fail:
 
       # Whether to log this
@@ -249,18 +310,13 @@ settings:
       #       - <uuid> will be replaced with the player's UUID
       #       - <amount> will be replaced with the amount attempted to be deposited
       #       - <error_message> will be replaced with the error message
-      message: "Failed to deposit <amount> to <player>'s (<uuid>) balance. Error message: <error_message>"
+      message: "(Vault) Failed to deposit <amount> to <player>'s (<uuid>) balance. Error message: <error_message>"
 
   # Miscellaneous settings
   misc:
 
     # The maximum number of player names that should be cached for offline tab completion - the most recently-seen players are cached
     most-recent-player-names-cache-max-size: 4000
-
-    # How often you want player data files to be saved in the background, in seconds
-    #       - Each save will only happen if a change was made since the previous save, such as a player's balance changing
-    # Default: 5
-    data-file-save-frequency: 5
 
 ################################################
 #                                              #
@@ -275,52 +331,73 @@ messages:
     # Messages related to the "set" sub-command
     set:
 
+      # What the command sender receives upon setting the balance of a player
+      #      - <target> will be replaced with the name of the target player
+      #      - <amount> will be replaced with the amount the target's balance was set to
+      balance-set-sender: "<dark_aqua>Set the balance of <gold><target></gold> to <gold><amount></gold>.</dark_aqua>"
+
       # What the target receives upon their balance being set
       #      - <amount> will be replaced with the amount the target's balance was set to
       balance-set-target: "<dark_aqua>Your balance has been set to <gold><amount></gold>.</dark_aqua>"
 
-      # What the command sender receives upon setting the balance of a player
-      #      - <target> will be replaced with the target's username
-      #      - <amount> will be replaced with the amount the target's balance was set to
-      balance-set-sender: "<dark_aqua>Set the balance of <gold><target></gold> to <gold><amount></gold>.</dark_aqua>"
-
     # Messages related to the "give" sub-command
     give:
 
+      # What the command sender receives upon giving money to a player
+      #      - <target> will be replaced with the name of the target player
+      #      - <amount> will be replaced with the amount given
+      #      - <balance> will be replaced with the target's resulting balance
+      money-given-sender: "<dark_aqua>Gave <gold><amount></gold> to <gold><target></gold>. They now have <gold><balance></gold>.</dark_aqua>"
+
       # What the target receives upon having money given to them
       #      - <amount> will be replaced with the amount given
-      money-given-target: "<dark_aqua><gold><amount></gold> has been added to your balance.</dark_aqua>"
-
-      # What the command sender receives upon giving money to a player
-      #      - <target> will be replaced with the target's username
-      #      - <amount> will be replaced with the amount given
-      money-given-sender: "<dark_aqua>Gave <gold><amount></gold> to <gold><target></gold>.</dark_aqua>"
+      #      - <balance> will be replaced with the target's resulting balance
+      money-given-target: "<dark_aqua><gold><amount></gold> has been added to your balance. You now have <gold><balance></gold>.</dark_aqua>"
 
     # Messages related to the "take" sub-command
     take:
 
+      # What the command sender receives upon taking money from a player
+      #      - <target> will be replaced with the name of the target player
+      #      - <amount> will be replaced with the amount taken
+      #      - <balance> will be replaced with the target's resulting balance
+      money-taken-sender: "<dark_aqua>Took <gold><amount></gold> from <gold><target></gold>. They now have <gold><balance></gold></dark_aqua>"
+
       # What the target receives upon having money taken from them
       #      - <amount> will be replaced with the amount taken
-      money-taken-target: "<dark_aqua><gold><amount></gold> has been taken from your balance.</dark_aqua>"
+      #      - <balance> will be replaced with the target's resulting balance
+      money-taken-target: "<dark_aqua><gold><amount></gold> has been taken from your balance You now have <gold><balance></gold>.</dark_aqua>"
 
-      # What the command sender receives upon taking money from a player
-      #      - <target> will be replaced with the target's username
-      #      - <amount> will be replaced with the amount taken
-      money-taken-sender: "<dark_aqua>Took <gold><amount></gold> from <gold><target></gold>.</dark_aqua>"
+      # When the command sender tries to take money from a player, but it would result in the target player's balance being less than 0
+      #      - <target> will be replaced with the name of the target player
+      #      - <amount> will be replaced with the specified amount
+      insufficient-funds: "<red><gold><target></gold> does not have enough money to afford losing <gold><amount></gold>.</red>"
 
     # Messages related to the "reset" sub-command
     reset:
 
-      # What the target receives upon their balance being reset
-      #      - <default_balance> will be replaced with the default balance
-      balance-reset-target: "<dark_aqua>Your balance has been reset to default (<gold><default_balance></gold>).</dark_aqua>"
-
       # What the sender receives upon resetting the balance of a player
-      #      - <target> will be replaced with the target's username
-      #      - <default_balance> will be replaced with the default balance
-      balance-reset-sender: "<dark_aqua>Reset the balance of <gold><target></gold> to default (<gold><default_balance></gold>).</dark_aqua>"
+      #      - <target> will be replaced with the name of the target player
+      #      - <balance> will be replaced with the configured default balance
+      balance-reset-sender: "<dark_aqua>Reset the balance of <gold><target></gold> to default (<gold><balance></gold>).</dark_aqua>"
 
-    # When the command sender reloads the config and data files using "/economy reload"
+      # What the target receives upon their balance being reset
+      #       - <balance> will be replaced with the configured default balance
+      balance-reset-target: "<dark_aqua>Your balance has been reset to default (<gold><balance></gold>).</dark_aqua>"
+
+      # When a player's balance is attempted to be reset, but it would result in their balance being negative
+      #      - <target> will be replaced with the name of the target player
+      negative-default-balance: "<red>The default balance is currently configured to be negative. This means that resetting <gold><target></gold>'s balance would result in their balance being negative, and TheosisEconomy does not support negative balances.</red>"
+
+      # When a player's balance is attempted to be reset, but it would result in the number of decimal places in their balance being higher than what the currency is configured to use
+      #      - <target> will be replaced with the name of the target player
+      too-many-decimal-places-default-balance: "<red>The default balance is currently configured to use more decimal places than what the currency is currently configured to use. This means that resetting <gold><target></gold>'s balance would result in their new balance having more decimal places than what the currency is configured to use.</red>"
+
+      # When a player's balance is attempted to be reset, but it would result in setting their balance being higher than the maximum balance
+      #      - <target> will be replaced with the name of the target player
+      default-balance-exceeds-max-balance: "<red>The default balance is currently configured to be greater than the maximum balance. This means that resetting <gold><target></gold>'s balance would result in their new balance exceeding the maximum balance.</red>"
+
+    # When the command sender reloads the plugin using "/economy reload"
     reload: "<dark_aqua>Reload successful.</dark_aqua>"
 
     # When no or an incorrect sub-command is used
@@ -340,60 +417,41 @@ messages:
     your-balance: "<dark_aqua>You have <gold><balance></gold>.</dark_aqua>"
 
     # When a player checks another player's balance
-    #      - <target> will be replaced with the target's username
+    #      - <target> will be replaced with the name of the target player
     #      - <balance> will be replaced with the target's balance
     their-balance: "<dark_aqua><gold><target></gold> has <gold><balance></gold>.</dark_aqua>"
 
   # Messages related to the "/balancetop" command
   balancetop:
 
-    # The header
-    #      - <page> will be replaced with the current page
-    #      - <pages> will be replaced with the total number of pages
-    #      - <total> will be replaced with the total balance of the server
-    header: |-
-      <gray>----------(<green>Top Balances (Page: <gold><page></gold>/<gold><pages></gold>)</green>)----------</gray>
-      <aqua>Total:</aqua> <light_purple><total></light_purple>
-
-    # What each entry will look like
-    #      - <position> will be replaced with the player's leaderboard position
-    #      - <player> will be replaced with the player's username
-    #      - <dots> will be replaced with the number of dots required to align the content of the entry after the placeholder with that of other entries
-    #      - <balance> will be replaced with the player's balance
-    entry: "<dark_aqua><position>.</dark_aqua> <gold><player></gold> <dark_gray><dots></dark_gray> <gold><balance></gold>"
-
-    # What the entry representing the command sender will look like
-    #      - <position> will be replaced with the player's leaderboard position
-    #      - <player> will be replaced with the player's username
-    #      - <dots> will be replaced with the number of dots required to align the content of the entry after the placeholder with that of other entries
-    #      - <balance> will be replaced with the player's balance
-    entry-you: "<aqua><position>.</aqua> <yellow><player></yellow> <gray><dots></gray> <yellow><balance></yellow>"
-
     # The message sent if there are no entries
-    #      - <total> will be replaced with the total balance of the server
-    no-entries: |-
-      <aqua>Total:</aqua> <light_purple><total></light_purple>
-      <red>There are no balances to show.</red>
+    no-entries: "<red>There are no balances to show.</red>"
 
   # Messages related to the "/pay" command
   pay:
 
+    # What the command sender receives upon paying a player
+    #      - <target> will be replaced with the name of the target player
+    #      - <amount> will be replaced with the amount paid
+    #      - <balance> will be replaced with the sender's resulting balance
+    paid-sender: "<dark_aqua>Successfully paid <gold><amount></gold> to <gold><target></gold>. You now have <gold><balance></gold>.</dark_aqua>"
+
     # What the target receives upon being paid by a player
     #       - <player> will be replaced with the command sender's username
     #       - <amount> will be replaced with the amount paid
-    paid-target: "<dark_aqua>You have been paid <gold><amount></gold> by <gold><player></gold>.</dark_aqua>"
-
-    # What the command sender receives upon paying a player
-    #      - <target> will be replaced with the target's username
-    #      - <amount> will be replaced with the amount paid
-    paid-sender: "<dark_aqua>Successfully paid <gold><amount></gold> to <gold><target></gold>.<dark_aqua>"
-
-    # When a player tries to pay another player who is not accepting payments
-    #      - <target> will be replaced with the target's username
-    not-accepting-payments: "<red><gold><target></gold> is not accepting payments from other players.</red>"
+    #       - <balance> will be replaced with the target's resulting balance
+    paid-target: "<dark_aqua>You have been paid <gold><amount></gold> by <gold><player></gold>. You now have <gold><balance></gold>.</dark_aqua>"
 
     # When a player tries to pay themselves
-    cannot-pay-yourself: "<red>You cannot pay yourself.</red>"
+    cannot-pay-self: "<red>You cannot pay yourself.</red>"
+
+    # When a player tries to pay another player who is not accepting payments
+    #      - <target> will be replaced with the name of the target player
+    not-accepting-payments: "<red><gold><target></gold> is not accepting payments from other players.</red>"
+
+    # When a player tries to pay another player, but it would result in their own balance being less than 0
+    #      - <amount> will be replaced with the specified amount
+    insufficient-funds: "<red>You do not have enough money to afford losing <gold><amount></gold>.</red>"
 
   # Messages related to the "/paytoggle" command
   paytoggle:
@@ -407,6 +465,9 @@ messages:
   # Generic error messages
   error:
 
+    # When an internal error occurs, such as an SQL exception preventing a payment with `/pay` from processing
+    internal: "<red>An internal error occurred. Please contact server staff.</red>"
+
     # When a player tries to do something they don't have permission to do
     no-permission: "<red>You do not have permission to do that.</red>"
 
@@ -418,46 +479,28 @@ messages:
     # When the console tries to use a command in a way that it can't (e.g. tries to check its own balance with "/balance")
     console-cannot-use: "<red>Only players can do that.</red>"
 
-    # When a player-targetting command is run, but the target has not joined before, and they need to have in order for the command to work
+    # When a player-targeting command is run, but the target has not joined before, and they need to have in order for the command to work
     #      - <name> will be replaced with the specified name
     not-joined-before: "<red><gold><name></gold> has not joined before.</red>"
 
-    # When a player runs a command that requires them to have an account, but they don't have one
-    no-account: "<red>You do not have an account.</red>"
+    # When a command requires the sender to have an account, but they somehow do not
+    sender-account-not-found: "<red>Your economy account could not be found. This is an error; please contact server staff.</red>"
 
-    # When a player-targetting command is run, but the target does not have an account, and they need one in order for the command to work
-    #      - <target> will be replaced with the target's username
-    no-account-other: "<red><gold><target></gold> does not have an account.</red>"
+    # When a player-targeting command requires the target player to have an account, but they do not
+    #      - <target> will be replaced with the name of the target player
+    target-account-not-found: "<red><gold><target></gold>'s economy account could not be found.</red>"
 
-    # When a player-targetting command is run that would result in the target's balance exceeding the server's maximum balance
-    #      - <target> will be replaced with the target's username
-    would-exceed-max-balance: "<red>This would result in the balance of <gold><target></gold> exceeding the maximum balance.</red>"
-
-    # When a player runs a command that would result in their balance being less than 0
-    #      - <amount> will be replaced with the specified amount
-    insufficient-funds: "<red>You do not have enough money to afford losing <gold><amount></gold>.</red>"
-
-    # When a player-targetting command is run that would result in the target's balance being less than 0
-    #      - <target> will be replaced with the target's username
-    #      - <amount> will be replaced with the specified amount
-    insufficient-funds-other: "<red><gold><target></gold> does not have enough money to afford losing <gold><amount></gold>.</red>"
+    # When an amount is specified that must not be negative, but is
+    negative-amount: "<red>Amount must not be negative.</red>"
 
     # When an amount is specified that must be greater than zero, but isn't
-    not-greater-than-zero-amount: "<red>Amount must be greater than zero.</red>"
+    zero-or-less-amount: "<red>Amount must be greater than zero.</red>"
 
     # When an amount specified is accurate to more decimal places than what the currency is configured to use
-    #      - <amount> will be replaced with the specified amount
     #      - <decimal_places> will be replaced with the number of decimal places that the currency is configured to use
-    too-many-decimal-places-amount: "<red><gold><amount></gold> is accurate to too many decimal places. The maximum is <gold><decimal_places></gold> decimal places.</red>"
+    too-many-decimal-places-amount: "<red>Amount uses to too many decimal places. The maximum is <gold><decimal_places></gold> decimal place(s).</red>"
 
-    # When the "/economy reset" command is used on a player, but it would result in setting their balance being higher than the maximum balance
-    #      - <target> will be replaced with the target's username
-    default-balance-exceeds-max-balance: "<red>The default balance is currently configured to be greater than the maximum balance. This means that resetting <gold><target></gold>'s balance would result in their new balance exceeding the maximum balance.</red>"
-
-    # When the "/economy reset" command is used on a player, but it would result in their balance being negative
-    #      - <target> will be replaced with the target's username
-    negative-default-balance: "<red>The default balance is currently configured to be negative. This means that resetting <gold><target></gold>'s balance would result in their balance being negative, and TheosisEconomy does not support negative balances.</red>"
-
-    # When the "/economy reset" command is used on a player, but it would result in the number of decimal places in their balance being higher than what the currency is configured to use
-    #      - <target> will be replaced with the target's username
-    too-many-decimal-places-default-balance: "<red>The default balance is currently configured to use more decimal places than what the currency is currently configured to use. This means that resetting <gold><target></gold>'s balance would result in their new balance having more decimal places than what the currency is configured to use.</red>"
+    # When an amount of money is attempted to be given to a player, but it would result in the target player's balance exceeding the configured maximum balance
+    #      - <target> will be replaced with the name of the target player
+    #      - <max_balance> will be replaced with the configured maximum balance
+    would-exceed-max-balance: "<red>This would result in <gold><target></gold>'s balance exceeding the maximum (<gold><max_balance></gold>).</red>"

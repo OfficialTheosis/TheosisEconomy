@@ -5,17 +5,22 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.threadedregions.scheduler.EntityScheduler;
 import me.Short.TheosisEconomy.CustomCommandArguments.CachedOfflinePlayerArgument;
+import me.Short.TheosisEconomy.MessageType;
 import me.Short.TheosisEconomy.TheosisEconomy;
+import me.Short.TheosisEconomy.Util;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-@NullMarked
+import java.util.UUID;
+import java.util.logging.Level;
+
 public class BalanceCommand
 {
 
@@ -55,7 +60,7 @@ public class BalanceCommand
         {
             if (!(sender instanceof Player))
             {
-                sender.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString("messages.error.console-cannot-use")));
+                instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.console-cannot-use");
 
                 return;
             }
@@ -63,21 +68,45 @@ public class BalanceCommand
             target = (Player) sender;
         }
 
-        net.milkbowl.vault.economy.Economy economy = instance.getVaultEconomy();
+        UUID targetUuid = target.getUniqueId();
+        String targetName = target.getName();
 
-        // If the target player does not have an account, return
-        if (!economy.hasAccount(target))
+        EntityScheduler senderScheduler = sender instanceof Player senderPlayer ? senderPlayer.getScheduler() : null;
+
+        instance.getPlayerAccountManager().getBalance(targetUuid).whenComplete((balance, throwable) ->
         {
-            sender.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString(target != sender ? "messages.error.no-account-other" : "messages.error.no-account"),
-                    Placeholder.component("target", Component.text(target.getName()))));
+            if (throwable != null)
+            {
+                instance.getLogger().log(Level.SEVERE, "Failed to get balance of " + (targetName != null ? targetName : targetUuid.toString()) + "(" + targetUuid + ").", throwable);
 
-            return;
-        }
+                instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.internal");
 
-        // Send message to the command sender telling them the target's balance
-        sender.sendMessage(instance.getMiniMessage().deserialize(instance.getConfig().getString(target != sender ? "messages.balance.their-balance" : "messages.balance.your-balance"),
-                Placeholder.component("target", Component.text(target.getName())),
-                Placeholder.component("balance", Component.text(economy.format(economy.getBalance(target))))));
+                return;
+            }
+
+            Runnable commandLogic = () ->
+            {
+                // If the balance is null, it means the target player does not have an account, so return
+                if (balance == null)
+                {
+                    instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.target-account-not-found",
+                            Placeholder.component("target", Component.text(targetName != null ? targetName : targetUuid.toString())));
+
+                    return;
+                }
+
+                instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, sender instanceof Player senderPlayer && senderPlayer.getUniqueId().equals(targetUuid) ? "messages.balance.your-balance" : "messages.balance.their-balance",
+                        Placeholder.component("target", Component.text(targetName != null ? targetName : targetUuid.toString())),
+                        Placeholder.component("balance", Component.text(Util.formatMoney(instance, balance))));
+            };
+
+            Runnable fallback = () -> Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
+
+            if (senderScheduler == null || !senderScheduler.execute(instance, commandLogic, fallback, 0L))
+            {
+                fallback.run();
+            }
+        });
     }
 
 }

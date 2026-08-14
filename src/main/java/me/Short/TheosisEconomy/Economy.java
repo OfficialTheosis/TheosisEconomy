@@ -4,22 +4,13 @@ import net.milkbowl.vault.economy.EconomyResponse;
 import net.milkbowl.vault.economy.EconomyResponse.ResponseType;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.configuration.file.FileConfiguration;
 
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
 import java.util.List;
-import java.util.UUID;
 import java.util.logging.Level;
 
 public class Economy implements net.milkbowl.vault.economy.Economy
 {
-
-    // EconomyResponse error messages
-    private static final String ERROR_INSUFFICIENT_FUNDS = "Insufficient funds.";
-    private static final String ERROR_WOULD_EXCEED_MAX_BALANCE = "Would exceed the configured maximum balance.";
-    private static final String ERROR_TOO_MANY_DECIMAL_PLACES = "Too many decimal places.";
-    private static final String ERROR_NOT_GREATER_THAN_ZERO = "Amount is not greater than zero.";
 
     private final TheosisEconomy instance;
 
@@ -49,45 +40,32 @@ public class Economy implements net.milkbowl.vault.economy.Economy
     @Override
     public int fractionalDigits()
     {
-        return instance.getConfig().getInt("settings.currency.decimal-places");
+        return instance.getDecimalPlaces();
     }
 
     @Override
     public String format(double amount)
     {
-        // Determine which formatter to use, depending on how many decimal places the currency is configured to use, and whether the amount is a whole number
-        DecimalFormat formatter;
-        if (fractionalDigits() > 0 && amount % 1 != 0)
-        {
-            formatter = instance.getDecimalFormatter();
-        }
-        else
-        {
-            formatter = instance.getWholeNumberFormatter();
-        }
-
-        // Return formatted output, applying decimal format to the amount
-        return instance.getConfig().getString("settings.currency.format")
-                .replace("<amount>", formatter.format(amount))
-                .replace("<name>", amount == 1D ? currencyNameSingular() : currencyNamePlural());
+        return Util.formatMoney(instance, BigDecimal.valueOf(amount));
     }
 
     @Override
     public String currencyNamePlural()
     {
-        return instance.getConfig().getString("settings.currency.name-plural");
+        return instance.getConfigSnapshot().getString("settings.currency.name-plural");
     }
 
     @Override
     public String currencyNameSingular()
     {
-        return instance.getConfig().getString("settings.currency.name-singular");
+        return instance.getConfigSnapshot().getString("settings.currency.name-singular");
     }
 
     @Override
     public boolean hasAccount(OfflinePlayer player)
     {
-        return instance.getPlayerAccounts().containsKey(player.getUniqueId());
+        // Return whether an account for this player is loaded - checking for an account's existence would require database I/O or caching *all* of them in memory
+        return instance.getPlayerAccountManager().isAccountLoaded(player.getUniqueId());
     }
 
     @Override
@@ -99,7 +77,10 @@ public class Economy implements net.milkbowl.vault.economy.Economy
     @Override
     public double getBalance(OfflinePlayer player)
     {
-        return instance.getPlayerAccounts().get(player.getUniqueId()).getBalance().doubleValue();
+        // Only loaded accounts can be queried without performing database I/O
+        BigDecimal balance = instance.getPlayerAccountManager().getLoadedAccountBalance(player.getUniqueId());
+
+        return balance != null ? balance.doubleValue() : 0D;
     }
 
     @Override
@@ -111,7 +92,10 @@ public class Economy implements net.milkbowl.vault.economy.Economy
     @Override
     public boolean has(OfflinePlayer player, double amount)
     {
-        return instance.getPlayerAccounts().get(player.getUniqueId()).getBalance().compareTo(BigDecimal.valueOf(amount)) >= 0;
+        // Only loaded accounts can be queried without performing database I/O
+        BigDecimal balance = instance.getPlayerAccountManager().getLoadedAccountBalance(player.getUniqueId());
+
+        return balance != null && balance.compareTo(BigDecimal.valueOf(amount)) >= 0;
     }
 
     @Override
@@ -123,83 +107,40 @@ public class Economy implements net.milkbowl.vault.economy.Economy
     @Override
     public EconomyResponse withdrawPlayer(OfflinePlayer player, double amount)
     {
-        FileConfiguration config = instance.getConfig();
+        ConfigSnapshot config = instance.getConfigSnapshot();
 
-        UUID uuid = player.getUniqueId();
+        BalanceChange balanceChange = instance.getPlayerAccountManager().subtractFromLoadedAccountBalance(player.getUniqueId(), BigDecimal.valueOf(amount));
 
-        BigDecimal currentBalance = instance.getPlayerAccounts().get(uuid).getBalance();
-        BigDecimal bdAmount = Util.round(BigDecimal.valueOf(amount), fractionalDigits(), RoundingMode.valueOf(config.getString("settings.currency.rounding-mode"))).stripTrailingZeros();
-        double bdAmountDoubleValue = bdAmount.doubleValue();
+        BalanceChangeResult balanceChangeResult = balanceChange.result();
 
-        // If the amount is 0 or less, log error, and return failure economy response
-        if (bdAmount.compareTo(BigDecimal.ZERO) <= 0)
+        BigDecimal bdAmount = balanceChange.amount();
+
+        BigDecimal resultingBalance = balanceChange.resultingBalance();
+
+        if (balanceChangeResult == BalanceChangeResult.SUCCESS)
         {
-            // Log the failure to the console if config.yml says to do so
-            if (config.getBoolean("settings.logging.vault-withdraw-fail.log"))
+            if (config.getBoolean("settings.logging.vault-withdraw-success.log"))
             {
-                instance.getLogger().log(Level.WARNING, config.getString("settings.logging.vault-withdraw-fail.message")
+                instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.vault-withdraw-success.message")
                         .replace("<player>", player.getName())
-                        .replace("<uuid>", uuid.toString())
+                        .replace("<uuid>", player.getUniqueId().toString())
                         .replace("<amount>", bdAmount.toPlainString())
-                        .replace("<error_message>", ERROR_NOT_GREATER_THAN_ZERO));
+                        .replace("<balance>", resultingBalance.toPlainString()));
             }
 
-            return new EconomyResponse(bdAmountDoubleValue, currentBalance.doubleValue(), ResponseType.FAILURE, ERROR_NOT_GREATER_THAN_ZERO);
+            return new EconomyResponse(bdAmount.doubleValue(), resultingBalance.doubleValue(), ResponseType.SUCCESS, null);
         }
 
-        // If the amount uses more decimal places than the configured amount, log error, and return failure economy response
-        if (bdAmount.scale() > fractionalDigits())
+        if (config.getBoolean("settings.logging.vault-withdraw-fail.log"))
         {
-            // Log the failure to the console if config.yml says to do so
-            if (config.getBoolean("settings.logging.vault-withdraw-fail.log"))
-            {
-                instance.getLogger().log(Level.WARNING, config.getString("settings.logging.vault-withdraw-fail.message")
-                        .replace("<player>", player.getName())
-                        .replace("<uuid>", uuid.toString())
-                        .replace("<amount>", bdAmount.toPlainString())
-                        .replace("<error_message>", ERROR_TOO_MANY_DECIMAL_PLACES));
-            }
-
-            return new EconomyResponse(bdAmountDoubleValue, currentBalance.doubleValue(), ResponseType.FAILURE, ERROR_TOO_MANY_DECIMAL_PLACES);
-        }
-
-        // If the player does not have enough money, log error, and return failure economy response
-        if (!has(player, bdAmountDoubleValue))
-        {
-            // Log the failure to the console if config.yml says to do so
-            if (config.getBoolean("settings.logging.vault-withdraw-fail.log"))
-            {
-                instance.getLogger().log(Level.WARNING, config.getString("settings.logging.vault-withdraw-fail.message")
-                        .replace("<player>", player.getName())
-                        .replace("<uuid>", uuid.toString())
-                        .replace("<amount>", bdAmount.toPlainString())
-                        .replace("<error_message>", ERROR_INSUFFICIENT_FUNDS));
-            }
-
-            return new EconomyResponse(bdAmountDoubleValue, currentBalance.doubleValue(), ResponseType.FAILURE, ERROR_INSUFFICIENT_FUNDS);
-        }
-
-        PlayerAccount account = instance.getPlayerAccounts().get(uuid);
-
-        BigDecimal resultingBalance = currentBalance.subtract(bdAmount);
-
-        // Update the player's balance
-        account.setBalance(resultingBalance);
-
-        // Mark for saving
-        instance.getDirtyPlayerAccountSnapshots().put(uuid, account.snapshot());
-
-        // Log the change to the console if config.yml says to do so
-        if (config.getBoolean("settings.logging.vault-withdraw-success.log"))
-        {
-            instance.getLogger().log(Level.INFO, config.getString("settings.logging.vault-withdraw-success.message")
+            instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.vault-withdraw-fail.message")
                     .replace("<player>", player.getName())
-                    .replace("<uuid>", uuid.toString())
+                    .replace("<uuid>", player.getUniqueId().toString())
                     .replace("<amount>", bdAmount.toPlainString())
-                    .replace("<balance>", resultingBalance.toPlainString()));
+                    .replace("<error_message>", balanceChangeResult.getErrorMessage()));
         }
 
-        return new EconomyResponse(bdAmountDoubleValue, resultingBalance.doubleValue(), ResponseType.SUCCESS, null);
+        return new EconomyResponse(bdAmount.doubleValue(), resultingBalance != null ? resultingBalance.doubleValue() : 0D, ResponseType.FAILURE, balanceChangeResult.getErrorMessage());
     }
 
     @Override
@@ -211,83 +152,40 @@ public class Economy implements net.milkbowl.vault.economy.Economy
     @Override
     public EconomyResponse depositPlayer(OfflinePlayer player, double amount)
     {
-        FileConfiguration config = instance.getConfig();
+        ConfigSnapshot config = instance.getConfigSnapshot();
 
-        UUID uuid = player.getUniqueId();
+        BalanceChange balanceChange = instance.getPlayerAccountManager().addToLoadedAccountBalance(player.getUniqueId(), BigDecimal.valueOf(amount));
 
-        BigDecimal currentBalance = instance.getPlayerAccounts().get(uuid).getBalance();
-        BigDecimal bdAmount = Util.round(BigDecimal.valueOf(amount), fractionalDigits(), RoundingMode.valueOf(config.getString("settings.currency.rounding-mode"))).stripTrailingZeros();
-        double bdAmountDoubleValue = bdAmount.doubleValue();
+        BalanceChangeResult balanceChangeResult = balanceChange.result();
 
-        // If the amount is 0 or less, log error, and return failure economy response
-        if (bdAmount.compareTo(BigDecimal.ZERO) <= 0)
+        BigDecimal bdAmount = balanceChange.amount();
+
+        BigDecimal resultingBalance = balanceChange.resultingBalance();
+
+        if (balanceChangeResult == BalanceChangeResult.SUCCESS)
         {
-            // Log the failure to the console if config.yml says to do so
-            if (config.getBoolean("settings.logging.vault-deposit-fail.log"))
+            if (config.getBoolean("settings.logging.vault-deposit-success.log"))
             {
-                instance.getLogger().log(Level.WARNING, config.getString("settings.logging.vault-deposit-fail.message")
+                instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.vault-deposit-success.message")
                         .replace("<player>", player.getName())
-                        .replace("<uuid>", uuid.toString())
+                        .replace("<uuid>", player.getUniqueId().toString())
                         .replace("<amount>", bdAmount.toPlainString())
-                        .replace("<error_message>", ERROR_NOT_GREATER_THAN_ZERO));
+                        .replace("<balance>", resultingBalance.toPlainString()));
             }
 
-            return new EconomyResponse(bdAmountDoubleValue, currentBalance.doubleValue(), ResponseType.FAILURE, ERROR_NOT_GREATER_THAN_ZERO);
+            return new EconomyResponse(bdAmount.doubleValue(), resultingBalance.doubleValue(), ResponseType.SUCCESS, null);
         }
 
-        // If the amount uses more decimal places than the configured amount, log error, and return failure economy response
-        if (bdAmount.scale() > fractionalDigits())
+        if (config.getBoolean("settings.logging.vault-deposit-fail.log"))
         {
-            // Log the failure to the console if config.yml says to do so
-            if (config.getBoolean("settings.logging.vault-deposit-fail.log"))
-            {
-                instance.getLogger().log(Level.WARNING, config.getString("settings.logging.vault-deposit-fail.message")
-                        .replace("<player>", player.getName())
-                        .replace("<uuid>", uuid.toString())
-                        .replace("<amount>", bdAmount.toPlainString())
-                        .replace("<error_message>", ERROR_TOO_MANY_DECIMAL_PLACES));
-            }
-
-            return new EconomyResponse(bdAmountDoubleValue, currentBalance.doubleValue(), ResponseType.FAILURE, ERROR_TOO_MANY_DECIMAL_PLACES);
-        }
-
-        BigDecimal resultingBalance = currentBalance.add(bdAmount);
-
-        // If the resulting balance is greater than the configured maximum balance, log error, and return failure economy response
-        if (resultingBalance.compareTo(new BigDecimal(config.getString("settings.currency.max-balance"))) > 0)
-        {
-            // Log the failure to the console if config.yml says to do so
-            if (config.getBoolean("settings.logging.vault-deposit-fail.log"))
-            {
-                instance.getLogger().log(Level.WARNING, config.getString("settings.logging.vault-deposit-fail.message")
-                        .replace("<player>", player.getName())
-                        .replace("<uuid>", uuid.toString())
-                        .replace("<amount>", bdAmount.toPlainString())
-                        .replace("<error_message>", ERROR_WOULD_EXCEED_MAX_BALANCE));
-            }
-
-            return new EconomyResponse(bdAmountDoubleValue, currentBalance.doubleValue(), ResponseType.FAILURE, ERROR_WOULD_EXCEED_MAX_BALANCE);
-        }
-
-        PlayerAccount account = instance.getPlayerAccounts().get(uuid);
-
-        // Update the player's balance
-        account.setBalance(resultingBalance);
-
-        // Mark for saving
-        instance.getDirtyPlayerAccountSnapshots().put(uuid, account.snapshot());
-
-        // Log the change to the console if config.yml says to do so
-        if (config.getBoolean("settings.logging.vault-deposit-success.log"))
-        {
-            instance.getLogger().log(Level.INFO, config.getString("settings.logging.vault-deposit-success.message")
+            instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.vault-deposit-fail.message")
                     .replace("<player>", player.getName())
-                    .replace("<uuid>", uuid.toString())
+                    .replace("<uuid>", player.getUniqueId().toString())
                     .replace("<amount>", bdAmount.toPlainString())
-                    .replace("<balance>", resultingBalance.toPlainString()));
+                    .replace("<error_message>", balanceChangeResult.getErrorMessage()));
         }
 
-        return new EconomyResponse(bdAmountDoubleValue, resultingBalance.doubleValue(), ResponseType.SUCCESS, null);
+        return new EconomyResponse(bdAmount.doubleValue(), resultingBalance != null ? resultingBalance.doubleValue() : 0D, ResponseType.FAILURE, balanceChangeResult.getErrorMessage());
     }
 
     @Override
@@ -299,26 +197,8 @@ public class Economy implements net.milkbowl.vault.economy.Economy
     @Override
     public boolean createPlayerAccount(OfflinePlayer player)
     {
-        BigDecimal defaultBalance = new BigDecimal(instance.getConfig().getString("settings.currency.default-balance")).stripTrailingZeros();
-
-        // If the default balance is less than 0, uses more decimal places than what is configured, or is greater than the configured maximum balance, return `false`, indicating that the account creation was unsuccessful
-        if (defaultBalance.compareTo(BigDecimal.ZERO) < 0 || defaultBalance.scale() > fractionalDigits() || defaultBalance.compareTo(new BigDecimal(instance.getConfig().getString("settings.currency.max-balance"))) > 0)
-        {
-            return false;
-        }
-
-        UUID uuid = player.getUniqueId();
-
-        // Create new player account
-        PlayerAccount account = new PlayerAccount(defaultBalance, true);
-
-        // Add account to the cache
-        instance.getPlayerAccounts().put(uuid, account);
-
-        // Mark for saving
-        instance.getDirtyPlayerAccountSnapshots().put(uuid, account.snapshot());
-
-        return true;
+        // Account creation happens on player pre-login and requires database I/O
+        return false;
     }
 
     @Override
@@ -396,31 +276,8 @@ public class Economy implements net.milkbowl.vault.economy.Economy
     @Override
     public List<String> getBanks()
     {
-        return null;
+        return List.of();
     }
-
-    // ----- Getters for error messages -----
-    public static String getErrorInsufficientFunds()
-    {
-        return ERROR_INSUFFICIENT_FUNDS;
-    }
-
-    public static String getErrorWouldExceedMaxBalance()
-    {
-        return ERROR_WOULD_EXCEED_MAX_BALANCE;
-    }
-
-    public static String getErrorTooManyDecimalPlaces()
-    {
-        return ERROR_TOO_MANY_DECIMAL_PLACES;
-    }
-
-    public static String getErrorNotGreaterThanZero()
-    {
-        return ERROR_NOT_GREATER_THAN_ZERO;
-    }
-
-    // ----- Deprecated Economy methods -----
 
     @SuppressWarnings("deprecation")
     @Override
