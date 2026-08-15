@@ -193,7 +193,7 @@ public class PlaceholderAPI extends PlaceholderExpansion
 
                 if (dotsPlaceholderIndex != -1)
                 {
-                    return entryFormatted.replace("<dots>", ".".repeat(Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(instance.getMiniMessage().deserialize(entryFormatted.substring(0, dotsPlaceholderIndex))), true, config.getInt("settings.balancetop.entry-dot-alignment-width.player"))));
+                    return entryFormatted.replace("<dots>", ".".repeat(Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(instance.getMiniMessage().deserialize(entryFormatted.substring(0, dotsPlaceholderIndex))), true, config.getInt("settings.balancetop.entry-dot-alignment-width.players"))));
                 }
 
                 return entryFormatted;
@@ -237,7 +237,7 @@ public class PlaceholderAPI extends PlaceholderExpansion
                 {
                     MiniMessage miniMessage = instance.getMiniMessage();
 
-                    return instance.getLegacyComponentSerializer().serialize(miniMessage.deserialize(entryFormatted.replace("<dots>", ".".repeat(Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(miniMessage.deserialize(entryFormatted.substring(0, dotsPlaceholderIndex))), true, config.getInt("settings.balancetop.entry-dot-alignment-width.player"))))));
+                    return instance.getLegacyComponentSerializer().serialize(miniMessage.deserialize(entryFormatted.replace("<dots>", ".".repeat(Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(miniMessage.deserialize(entryFormatted.substring(0, dotsPlaceholderIndex))), true, config.getInt("settings.balancetop.entry-dot-alignment-width.players"))))));
                 }
 
                 return instance.getLegacyComponentSerializer().serialize(instance.getMiniMessage().deserialize(entryFormatted));

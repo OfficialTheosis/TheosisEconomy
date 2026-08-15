@@ -165,8 +165,8 @@ public class TheosisEconomy extends JavaPlugin
 
         // Set up activity logger
         activityLogger.setParent(getLogger());
-        activityLogger.setUseParentHandlers(configSnapshot.getBoolean("settings.logging.log-console"));
-        if (configSnapshot.getBoolean("settings.logging.log-file"))
+        activityLogger.setUseParentHandlers(configSnapshot.getBoolean("settings.activity-logging.log-console"));
+        if (configSnapshot.getBoolean("settings.activity-logging.log-file"))
         {
             activityLoggerFileHandler = setupActivityLoggerFileHandler(ACTIVITY_LOGGER_FILE_NAME);
         }
@@ -260,10 +260,10 @@ public class TheosisEconomy extends JavaPlugin
         configSnapshot = ConfigSnapshot.create(getConfig());
 
         // Set whether the activity logger should send logs to the console
-        activityLogger.setUseParentHandlers(configSnapshot.getBoolean("settings.logging.log-console"));
+        activityLogger.setUseParentHandlers(configSnapshot.getBoolean("settings.activity-logging.log-console"));
 
         // Set whether the activity logger should send logs to the "logs.log" file
-        if (configSnapshot.getBoolean("settings.logging.log-file"))
+        if (configSnapshot.getBoolean("settings.activity-logging.log-file"))
         {
             if (activityLoggerFileHandler == null)
             {
@@ -316,7 +316,7 @@ public class TheosisEconomy extends JavaPlugin
                 {
                     getLogger().log(Level.WARNING, "Failed to refresh cached BalanceTop entries.", throwable);
                     return null;
-                }), 1L, configSnapshot.getLong("settings.placeholders.balancetop-cache.refresh-interval") * 20L);
+                }), 1L, configSnapshot.getLong("settings.placeholders.balancetop-cache.refresh-interval-seconds") * 20L);
     }
 
     // Getter for "configSnapshot"

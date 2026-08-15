@@ -9,7 +9,9 @@ import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.threadedregions.scheduler.EntityScheduler;
 import me.Short.TheosisEconomy.BalanceTopEntry;
 import me.Short.TheosisEconomy.ConfigSnapshot;
+import me.Short.TheosisEconomy.MessageSender;
 import me.Short.TheosisEconomy.MessageType;
+import me.Short.TheosisEconomy.PlayerAccountManager;
 import me.Short.TheosisEconomy.TheosisEconomy;
 import me.Short.TheosisEconomy.Util;
 import net.kyori.adventure.text.Component;
@@ -22,7 +24,9 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
 
 public class BalanceTopCommand
@@ -60,15 +64,55 @@ public class BalanceTopCommand
     {
         CommandSender sender = ctx.getSource().getSender();
 
+        PlayerAccountManager playerAccountManager = instance.getPlayerAccountManager();
+
+        Set<UUID> activeBalanceTopRequests = playerAccountManager.getActiveBalanceTopRequests();
+
+        UUID senderUuid = sender instanceof Player senderPlayer ? senderPlayer.getUniqueId() : null;
+
+        // If the player already has a BalanceTop request in progress, return
+        if (senderUuid != null && !activeBalanceTopRequests.add(senderUuid))
+        {
+            instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.balancetop.request-in-progress");
+
+            return;
+        }
+
+        Semaphore balanceTopRequestPermits = playerAccountManager.getBalanceTopRequestPermits();
+
+        // If there are too many simultaneous BalanceTop requests in progress, return
+        if (!balanceTopRequestPermits.tryAcquire())
+        {
+            if (senderUuid != null)
+            {
+                activeBalanceTopRequests.remove(senderUuid);
+            }
+
+            instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.balancetop.too-many-simultaneous-requests-in-progress");
+
+            return;
+        }
+
+        MessageSender messageSender = instance.getMessageSender();
+
+        messageSender.sendConfigMiniMessage(sender, MessageType.CHAT, "messages.balancetop.fetching");
+
         EntityScheduler senderScheduler = sender instanceof Player senderPlayer ? senderPlayer.getScheduler() : null;
 
-        instance.getPlayerAccountManager().getBalanceTop(pageNumber).whenComplete((balanceTopPage, throwable) ->
+        playerAccountManager.getBalanceTop(pageNumber).whenComplete((balanceTopPage, throwable) ->
         {
+            balanceTopRequestPermits.release();
+
+            if (senderUuid != null)
+            {
+                activeBalanceTopRequests.remove(senderUuid);
+            }
+
             if (throwable != null)
             {
                 instance.getLogger().log(Level.SEVERE, "Failed to get top balances.", throwable);
 
-                instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.internal");
+                messageSender.sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.internal");
 
                 return;
             }
@@ -80,7 +124,7 @@ public class BalanceTopCommand
                 // If there are no entries, return
                 if (entries.isEmpty())
                 {
-                    instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.balancetop.no-entries");
+                    messageSender.sendConfigMiniMessage(sender, MessageType.CHAT, "messages.balancetop.no-entries");
 
                     return;
                 }
@@ -95,8 +139,6 @@ public class BalanceTopCommand
                 // Initial output (header)
                 Component output = miniMessage.deserialize(config.getString("settings.balancetop.header-format"),
                         Placeholder.component("page", Component.text(page)));
-
-                UUID senderUuid = sender instanceof Player senderPlayer ? senderPlayer.getUniqueId() : null;
 
                 for (int i = 0; i < entries.size(); i++)
                 {
@@ -126,7 +168,7 @@ public class BalanceTopCommand
                                 Placeholder.component("dots", Component.text(".".repeat(Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(miniMessage.deserialize(entryFormat.substring(0, dotsPlaceholderIndex),
                                         positionPlaceholder,
                                         playerPlaceholder,
-                                        balancePlaceholder)), forPlayer, config.getInt(forPlayer ? "settings.balancetop.entry-dot-alignment-width.player" : "settings.balancetop.entry-dot-alignment-width.console")))))));
+                                        balancePlaceholder)), forPlayer, config.getInt(forPlayer ? "settings.balancetop.entry-dot-alignment-width.players" : "settings.balancetop.entry-dot-alignment-width.console")))))));
                     }
                     else
                     {
@@ -138,7 +180,7 @@ public class BalanceTopCommand
                 }
 
                 // Send output
-                instance.getMessageSender().sendMessage(sender, MessageType.CHAT, output);
+                messageSender.sendMessage(sender, MessageType.CHAT, output);
             };
 
             Runnable fallback = () -> Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);

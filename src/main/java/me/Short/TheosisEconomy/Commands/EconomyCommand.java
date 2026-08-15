@@ -239,9 +239,9 @@ public class EconomyCommand
                         BigDecimal resultingBalance = balanceChange.resultingBalance();
 
                         // Log
-                        if (config.getBoolean("settings.logging.economy-set.log"))
+                        if (config.getBoolean("settings.activity-logging.economy-set.log"))
                         {
-                            instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.economy-set.message")
+                            instance.getActivityLogger().log(Level.INFO, config.getString("settings.activity-logging.economy-set.message")
                                     .replace("<player>", targetName != null ? targetName : targetUuid.toString())
                                     .replace("<uuid>", targetUuid.toString())
                                     .replace("<balance>", resultingBalance.toPlainString()));
@@ -321,9 +321,9 @@ public class EconomyCommand
                         BigDecimal resultingBalance = balanceChange.resultingBalance();
 
                         // Log
-                        if (config.getBoolean("settings.logging.economy-give.log"))
+                        if (config.getBoolean("settings.activity-logging.economy-give.log"))
                         {
-                            instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.economy-give.message")
+                            instance.getActivityLogger().log(Level.INFO, config.getString("settings.activity-logging.economy-give.message")
                                     .replace("<player>", targetName != null ? targetName : targetUuid.toString())
                                     .replace("<uuid>", targetUuid.toString())
                                     .replace("<amount>", bdAmount.toPlainString())
@@ -407,9 +407,9 @@ public class EconomyCommand
                         BigDecimal resultingBalance = balanceChange.resultingBalance();
 
                         // Log
-                        if (config.getBoolean("settings.logging.economy-take.log"))
+                        if (config.getBoolean("settings.activity-logging.economy-take.log"))
                         {
-                            instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.economy-take.message")
+                            instance.getActivityLogger().log(Level.INFO, config.getString("settings.activity-logging.economy-take.message")
                                     .replace("<player>", targetName != null ? targetName : targetUuid.toString())
                                     .replace("<uuid>", targetUuid.toString())
                                     .replace("<amount>", bdAmount.toPlainString())
@@ -492,9 +492,9 @@ public class EconomyCommand
                         BigDecimal resultingBalance = balanceChange.resultingBalance();
 
                         // Log
-                        if (config.getBoolean("settings.logging.economy-reset.log"))
+                        if (config.getBoolean("settings.activity-logging.economy-reset.log"))
                         {
-                            instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.economy-reset.message")
+                            instance.getActivityLogger().log(Level.INFO, config.getString("settings.activity-logging.economy-reset.message")
                                     .replace("<player>", targetName != null ? targetName : targetUuid.toString())
                                     .replace("<uuid>", targetUuid.toString())
                                     .replace("<balance>", resultingBalance.toPlainString()));

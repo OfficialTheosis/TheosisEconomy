@@ -134,9 +134,9 @@ public class PayCommand
                         BigDecimal senderResultingBalance = moneyTransfer.senderResultingBalance();
                         BigDecimal targetResultingBalanace = moneyTransfer.targetResultingBalance();
 
-                        if (config.getBoolean("settings.logging.pay.log"))
+                        if (config.getBoolean("settings.activity-logging.pay.log"))
                         {
-                            instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.pay.message")
+                            instance.getActivityLogger().log(Level.INFO, config.getString("settings.activity-logging.pay.message")
                                     .replace("<sender>", senderPlayer.getName())
                                     .replace("<sender_uuid>", senderPlayer.getUniqueId().toString())
                                     .replace("<target>", targetName != null ? targetName : targetUuid.toString())

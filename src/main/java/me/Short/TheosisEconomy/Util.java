@@ -83,7 +83,7 @@ public class Util
     }
 
     // Method to check whether a player is banned according to LiteBans - only call off the main thread
-    public static boolean isPlayerLiteBansPermanentlyBannedSync(UUID uuid)
+    public static boolean isPlayerLiteBansPermanentlyBanned(UUID uuid)
     {
         Entry ban = Database.get().getBan(uuid, getPlayerIpFromLiteBansDatabase(uuid), null);
 

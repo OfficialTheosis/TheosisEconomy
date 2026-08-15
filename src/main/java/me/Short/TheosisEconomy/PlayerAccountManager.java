@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -17,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -25,6 +27,7 @@ import java.util.logging.Level;
 
 public class PlayerAccountManager
 {
+
     private static final int BALANCE_TOP_BATCH_SIZE = 100;
 
     private final TheosisEconomy instance;
@@ -37,6 +40,10 @@ public class PlayerAccountManager
 
     private final ExecutorService balanceTopFilterExecutor = Executors.newSingleThreadExecutor(runnable -> new Thread(runnable, "TheosisEconomy-BalanceTop-Filter"));
 
+    private final Set<UUID> activeBalanceTopRequests = ConcurrentHashMap.newKeySet();
+
+    private final Semaphore balanceTopRequestPermits;
+
     private final ReentrantReadWriteLock lifecycleLock = new ReentrantReadWriteLock();
 
     private boolean shuttingDown;
@@ -47,6 +54,8 @@ public class PlayerAccountManager
     {
         this.instance = instance;
         this.databaseManager = databaseManager;
+
+        balanceTopRequestPermits = new Semaphore(instance.getConfigSnapshot().getInt("settings.balancetop.max-simultaneous-requests"));
     }
 
     /*
@@ -166,9 +175,9 @@ public class PlayerAccountManager
 
                     ConfigSnapshot config = instance.getConfigSnapshot();
 
-                    if (config.getBoolean("settings.logging.account-create.log"))
+                    if (config.getBoolean("settings.activity-logging.account-create.log"))
                     {
-                        instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.account-create.message")
+                        instance.getActivityLogger().log(Level.INFO, config.getString("settings.activity-logging.account-create.message")
                                 .replace("<player>", name)
                                 .replace("<uuid>", uuid.toString()));
                     }
@@ -1216,18 +1225,47 @@ public class PlayerAccountManager
         BigDecimal minimumBalance = new BigDecimal(config.getString("settings.balancetop.min-balance"));
         boolean considerExcludePermission = config.getBoolean("settings.balancetop.consider-exclude-permission");
 
-        return getBalanceTopPage(normalisedPage, normalisedEntriesPerPage, minimumBalance, considerExcludePermission)
-                .thenCompose(entries ->
-                {
-                    // If the requested page exists, or page 1 itself is empty, return it
-                    if (!entries.isEmpty() || normalisedPage == 1)
-                    {
-                        return CompletableFuture.completedFuture(new BalanceTopPage(normalisedPage, entries));
-                    }
+        // Page 1 never needs the candidate-count check
+        if (normalisedPage == 1)
+        {
+            return getBalanceTopPage(1, normalisedEntriesPerPage, minimumBalance, considerExcludePermission).thenApply(entries -> new BalanceTopPage(1, entries));
+        }
 
-                    // The requested page was too high, so fall back to page 1
-                    return getBalanceTopPage(1, normalisedEntriesPerPage, minimumBalance, considerExcludePermission).thenApply(firstPageEntries -> new BalanceTopPage(1, firstPageEntries));
-                });
+        long pageStart = (long) (normalisedPage - 1) * normalisedEntriesPerPage;
+
+        return submitDatabaseTask(() ->
+        {
+            try
+            {
+                return getBalanceTopCandidateCountFromDatabase(minimumBalance);
+            }
+            catch (SQLException e)
+            {
+                throw new CompletionException(e);
+            }
+        }).thenCompose(candidateCount ->
+        {
+            // There aren't enough candidates for this page to possibly exist, so don't attempt to calculate it
+            if (pageStart >= candidateCount)
+            {
+                return getBalanceTopPage(1, normalisedEntriesPerPage, minimumBalance, considerExcludePermission)
+                        .thenApply(entries -> new BalanceTopPage(1, entries));
+            }
+
+            return getBalanceTopPage(normalisedPage, normalisedEntriesPerPage, minimumBalance, considerExcludePermission)
+                    .thenCompose(entries ->
+                    {
+                        // The requested page exists
+                        if (!entries.isEmpty())
+                        {
+                            return CompletableFuture.completedFuture(new BalanceTopPage(normalisedPage, entries));
+                        }
+
+                        // The requested page looked possible based on the candidate count, but filters made it empty, so fall back to page 1
+                        return getBalanceTopPage(1, normalisedEntriesPerPage, minimumBalance, considerExcludePermission)
+                                .thenApply(firstPageEntries -> new BalanceTopPage(1, firstPageEntries));
+                    });
+        });
     }
 
     private CompletableFuture<List<BalanceTopEntry>> getBalanceTopPage(int page, int entriesPerPage, BigDecimal minimumBalance, boolean considerExcludePermission)
@@ -1238,6 +1276,26 @@ public class PlayerAccountManager
         List<BalanceTopEntry> pageEntries = new ArrayList<>(entriesPerPage);
 
         return collectBalanceTopEntries(minimumBalance, considerExcludePermission, pageStart, pageEnd, 0L, null, pageEntries).thenApply(ignored -> List.copyOf(pageEntries));
+    }
+
+    private long getBalanceTopCandidateCountFromDatabase(BigDecimal minimumBalance) throws SQLException
+    {
+        String sql = """
+            SELECT COUNT(*)
+            FROM player_accounts
+            WHERE balance >= ?;
+            """;
+
+        try (PreparedStatement statement = databaseManager.getConnection().prepareStatement(sql))
+        {
+            statement.setLong(1, balanceToDatabaseValue(minimumBalance));
+
+            try (ResultSet resultSet = statement.executeQuery())
+            {
+                resultSet.next();
+                return resultSet.getLong(1);
+            }
+        }
     }
 
     private List<BalanceTopEntry> getBalanceTopCandidatesFromDatabase(BigDecimal minimumBalance, int limit, BalanceTopEntry after) throws SQLException
@@ -1323,7 +1381,7 @@ public class PlayerAccountManager
         }
 
         // Exclude permanently LiteBans-banned players
-        if (instance.getLiteBansInstalled() && Util.isPlayerLiteBansPermanentlyBannedSync(uuid))
+        if (instance.getLiteBansInstalled() && Util.isPlayerLiteBansPermanentlyBanned(uuid))
         {
             return false;
         }
@@ -1655,6 +1713,16 @@ public class PlayerAccountManager
     public List<BalanceTopEntry> getCachedBalanceTopEntries()
     {
         return cachedBalanceTopEntries;
+    }
+
+    public Set<UUID> getActiveBalanceTopRequests()
+    {
+        return activeBalanceTopRequests;
+    }
+
+    public Semaphore getBalanceTopRequestPermits()
+    {
+        return balanceTopRequestPermits;
     }
 
 }

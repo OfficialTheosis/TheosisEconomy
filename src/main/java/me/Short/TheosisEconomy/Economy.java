@@ -119,9 +119,9 @@ public class Economy implements net.milkbowl.vault.economy.Economy
 
         if (balanceChangeResult == BalanceChangeResult.SUCCESS)
         {
-            if (config.getBoolean("settings.logging.vault-withdraw-success.log"))
+            if (config.getBoolean("settings.activity-logging.vault-withdraw-success.log"))
             {
-                instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.vault-withdraw-success.message")
+                instance.getActivityLogger().log(Level.INFO, config.getString("settings.activity-logging.vault-withdraw-success.message")
                         .replace("<player>", player.getName())
                         .replace("<uuid>", player.getUniqueId().toString())
                         .replace("<amount>", bdAmount.toPlainString())
@@ -131,9 +131,9 @@ public class Economy implements net.milkbowl.vault.economy.Economy
             return new EconomyResponse(bdAmount.doubleValue(), resultingBalance.doubleValue(), ResponseType.SUCCESS, null);
         }
 
-        if (config.getBoolean("settings.logging.vault-withdraw-fail.log"))
+        if (config.getBoolean("settings.activity-logging.vault-withdraw-fail.log"))
         {
-            instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.vault-withdraw-fail.message")
+            instance.getActivityLogger().log(Level.INFO, config.getString("settings.activity-logging.vault-withdraw-fail.message")
                     .replace("<player>", player.getName())
                     .replace("<uuid>", player.getUniqueId().toString())
                     .replace("<amount>", bdAmount.toPlainString())
@@ -164,9 +164,9 @@ public class Economy implements net.milkbowl.vault.economy.Economy
 
         if (balanceChangeResult == BalanceChangeResult.SUCCESS)
         {
-            if (config.getBoolean("settings.logging.vault-deposit-success.log"))
+            if (config.getBoolean("settings.activity-logging.vault-deposit-success.log"))
             {
-                instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.vault-deposit-success.message")
+                instance.getActivityLogger().log(Level.INFO, config.getString("settings.activity-logging.vault-deposit-success.message")
                         .replace("<player>", player.getName())
                         .replace("<uuid>", player.getUniqueId().toString())
                         .replace("<amount>", bdAmount.toPlainString())
@@ -176,9 +176,9 @@ public class Economy implements net.milkbowl.vault.economy.Economy
             return new EconomyResponse(bdAmount.doubleValue(), resultingBalance.doubleValue(), ResponseType.SUCCESS, null);
         }
 
-        if (config.getBoolean("settings.logging.vault-deposit-fail.log"))
+        if (config.getBoolean("settings.activity-logging.vault-deposit-fail.log"))
         {
-            instance.getActivityLogger().log(Level.INFO, config.getString("settings.logging.vault-deposit-fail.message")
+            instance.getActivityLogger().log(Level.INFO, config.getString("settings.activity-logging.vault-deposit-fail.message")
                     .replace("<player>", player.getName())
                     .replace("<uuid>", player.getUniqueId().toString())
                     .replace("<amount>", bdAmount.toPlainString())
