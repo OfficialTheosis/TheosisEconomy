@@ -41,7 +41,7 @@ repositories {
 dependencies {
     implementation("org.bstats:bstats-bukkit:3.2.1")
 
-    compileOnly("io.papermc.paper:paper-api:26.2.build.+")
+    compileOnly("io.papermc.paper:paper-api:26.2.build.112-stable")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7.1")
     compileOnly("me.clip:placeholderapi:2.12.2")
     compileOnly("com.gitlab.ruany:LiteBansAPI:0.6.1")
