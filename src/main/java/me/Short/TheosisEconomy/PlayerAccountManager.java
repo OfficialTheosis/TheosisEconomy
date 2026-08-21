@@ -55,7 +55,7 @@ public class PlayerAccountManager
         this.instance = instance;
         this.databaseManager = databaseManager;
 
-        balanceTopRequestPermits = new Semaphore(instance.getConfigSnapshot().getInt("settings.balancetop.max-simultaneous-requests"));
+        this.balanceTopRequestPermits = new Semaphore(instance.getConfigSnapshot().getInt("settings.balancetop.max-simultaneous-requests"));
     }
 
     /*
@@ -1381,7 +1381,7 @@ public class PlayerAccountManager
         }
 
         // Exclude permanently LiteBans-banned players
-        if (instance.getLiteBansInstalled() && Util.isPlayerLiteBansPermanentlyBanned(uuid))
+        if (instance.getLiteBansInstalled() && Util.isPlayerLiteBansPermanentlyBanned(instance, uuid))
         {
             return false;
         }

@@ -29,7 +29,11 @@ permissions:
     default: op
 
   theosiseconomy.balancetop.exclude:
-    description: "Players with this permission will be excluded from the /balancetop list, if enabled in config.yml."
+    description: "Players with this permission will be excluded from /balancetop outputs, if the permission is configured to be considered."
+    default: op
+
+  theosiseconomy.balancetop.bypassrequestlimit:
+    description: "Be allowed to submit /balancetop requests regardless of how many are currently in progress."
     default: op
 
   theosiseconomy.command.*:

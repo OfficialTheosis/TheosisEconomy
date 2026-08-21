@@ -250,7 +250,7 @@ public class TheosisEconomy extends JavaPlugin
         }
     }
 
-    // Method to reload the config and data files
+    // Reload the config and data files
     public void reload()
     {
         // Reload config
@@ -308,7 +308,7 @@ public class TheosisEconomy extends JavaPlugin
         }
     }
 
-    // Method to schedule BalanceTop refresh cache task
+    // Schedule BalanceTop refresh cache task
     private ScheduledTask scheduleBalanceTopCacheRefreshTask()
     {
         return Bukkit.getGlobalRegionScheduler().runAtFixedRate(this, scheduledTask ->

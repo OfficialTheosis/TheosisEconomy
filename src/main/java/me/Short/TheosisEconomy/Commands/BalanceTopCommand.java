@@ -59,16 +59,16 @@ public class BalanceTopCommand
                 ).build();
     }
 
-    // Method to execute the command logic
+    // Execute the command logic
     private static void executeCommandLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, int pageNumber)
     {
         CommandSender sender = ctx.getSource().getSender();
 
         PlayerAccountManager playerAccountManager = instance.getPlayerAccountManager();
 
-        Set<UUID> activeBalanceTopRequests = playerAccountManager.getActiveBalanceTopRequests();
-
         UUID senderUuid = sender instanceof Player senderPlayer ? senderPlayer.getUniqueId() : null;
+
+        Set<UUID> activeBalanceTopRequests = playerAccountManager.getActiveBalanceTopRequests();
 
         // If the player already has a BalanceTop request in progress, return
         if (senderUuid != null && !activeBalanceTopRequests.add(senderUuid))
@@ -78,10 +78,12 @@ public class BalanceTopCommand
             return;
         }
 
+        boolean senderShouldBypassRequestLimit = sender.hasPermission("theosiseconomy.balancetop.bypassrequestlimit");
+
         Semaphore balanceTopRequestPermits = playerAccountManager.getBalanceTopRequestPermits();
 
         // If there are too many simultaneous BalanceTop requests in progress, return
-        if (!balanceTopRequestPermits.tryAcquire())
+        if (!senderShouldBypassRequestLimit && !balanceTopRequestPermits.tryAcquire())
         {
             if (senderUuid != null)
             {
@@ -101,11 +103,14 @@ public class BalanceTopCommand
 
         playerAccountManager.getBalanceTop(pageNumber).whenComplete((balanceTopPage, throwable) ->
         {
-            balanceTopRequestPermits.release();
-
             if (senderUuid != null)
             {
                 activeBalanceTopRequests.remove(senderUuid);
+            }
+
+            if (!senderShouldBypassRequestLimit)
+            {
+                balanceTopRequestPermits.release();
             }
 
             if (throwable != null)

@@ -10,13 +10,14 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.UUID;
+import java.util.logging.Level;
 
 public class Util
 {
 
     private static final CharMatcher matchSplitter = CharMatcher.anyOf("._/");
 
-    // Method to check if a player's username matches a given substring - replicated from vanilla client behaviour: https://mcsrc.dev/1/26.2/net/minecraft/commands/SharedSuggestionProvider#L271
+    // Check if a player's username matches a given substring - replicated from vanilla client behaviour: https://mcsrc.dev/1/26.2/net/minecraft/commands/SharedSuggestionProvider#L271
     public static boolean nameMatchesSubstring(String pattern, String input)
     {
         int index = 0;
@@ -36,7 +37,7 @@ public class Util
         return true;
     }
 
-    // Method to return the number of dots needed to align the end of the dot sequence
+    // Get the number of dots needed to align the end of the dot sequence
     public static int getNumberOfDotsToAlign(String textBeforeDots, boolean forPlayer, int alignmentWidth)
     {
         if (forPlayer)
@@ -47,7 +48,7 @@ public class Util
         return Math.max(0, alignmentWidth - textBeforeDots.length());
     }
 
-    // Method to format an amount of money as per config, and apply comma separation
+    // Format an amount of money as per config, and apply comma separation
     public static String formatMoney(TheosisEconomy instance, BigDecimal amount)
     {
         ConfigSnapshot config = instance.getConfigSnapshot();
@@ -61,7 +62,7 @@ public class Util
                 .replace("<name>", amount.abs().compareTo(BigDecimal.ONE) == 0 ? config.getString("settings.currency.name-singular") : config.getString("settings.currency.name-plural"));
     }
 
-    // Method to round a value to the number of decimal places that the currency is configured to use
+    // Round a value to the number of decimal places that the currency is configured to use
     public static BigDecimal round(BigDecimal value, int decimalPlaces, RoundingMode mode)
     {
         if (mode == RoundingMode.ROUND_NEAREST)
@@ -82,16 +83,16 @@ public class Util
         return value;
     }
 
-    // Method to check whether a player is banned according to LiteBans - only call off the main thread
-    public static boolean isPlayerLiteBansPermanentlyBanned(UUID uuid)
+    // Check whether a player is permanently banned according to LiteBans - only call off the main thread
+    public static boolean isPlayerLiteBansPermanentlyBanned(TheosisEconomy instance, UUID uuid)
     {
-        Entry ban = Database.get().getBan(uuid, getPlayerIpFromLiteBansDatabase(uuid), null);
+        Entry ban = Database.get().getBan(uuid, getPlayerIpFromLiteBansDatabase(instance, uuid), null);
 
         return ban != null && ban.isPermanent();
     }
 
-    // Method to get a player's most recent IP address according to LiteBans' database - only call off the main thread
-    public static String getPlayerIpFromLiteBansDatabase(UUID uuid)
+    // Get a player's most recent IP address according to LiteBans' database - only call off the main thread
+    private static String getPlayerIpFromLiteBansDatabase(TheosisEconomy instance, UUID uuid)
     {
         try (PreparedStatement preparedStatement = Database.get().prepareStatement("SELECT ip FROM {history} WHERE uuid=? ORDER BY date DESC LIMIT 1"))
         {
@@ -105,8 +106,10 @@ public class Util
                 }
             }
         }
-        catch (SQLException ignored)
+        catch (SQLException e)
         {
+            instance.getLogger().log(Level.WARNING, "There was an error getting the latest IP for " + uuid + "from LiteBans' database.", e);
+
             return null;
         }
 

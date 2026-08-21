@@ -205,7 +205,7 @@ public class EconomyCommand
                 ).build();
     }
 
-    // Method to execute the logic for the "set" sub-command
+    // Execute the logic for the "set" sub-command
     private static void executeSetLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, double amount)
     {
         CommandSender sender = ctx.getSource().getSender();
@@ -287,7 +287,7 @@ public class EconomyCommand
         });
     }
 
-    // Method to execute the logic for the "give" sub-command
+    // Execute the logic for the "give" sub-command
     private static void executeGiveLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, double amount)
     {
         CommandSender sender = ctx.getSource().getSender();
@@ -373,7 +373,7 @@ public class EconomyCommand
         });
     }
 
-    // Method to execute the logic for the "take" sub-command
+    // Execute the logic for the "take" sub-command
     private static void executeTakeLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, double amount)
     {
         CommandSender sender = ctx.getSource().getSender();
@@ -459,7 +459,7 @@ public class EconomyCommand
         });
     }
 
-    // Method to execute the logic for the "reset" sub-command
+    // Execute the logic for the "reset" sub-command
     private static void executeResetLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target)
     {
         ConfigSnapshot config = instance.getConfigSnapshot();
@@ -540,7 +540,7 @@ public class EconomyCommand
         });
     }
 
-    // Method to execute the logic for the "reload" sub-command
+    // Execute the logic for the "reload" sub-command
     private static void executeReloadLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx)
     {
         Bukkit.getGlobalRegionScheduler().execute(instance, () ->

@@ -90,7 +90,7 @@ public class PayCommand
                 ).build();
     }
 
-    // Method to execute the command logic
+    // Execute the command logic
     private static void executeCommandLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, double amount)
     {
         CommandSender sender = ctx.getSource().getSender();

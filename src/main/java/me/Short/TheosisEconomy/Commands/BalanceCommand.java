@@ -51,7 +51,7 @@ public class BalanceCommand
                 ).build();
     }
 
-    // Method to execute the command logic
+    // Execute the command logic
     private static void executeCommandLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, @Nullable OfflinePlayer target)
     {
         CommandSender sender = ctx.getSource().getSender();
