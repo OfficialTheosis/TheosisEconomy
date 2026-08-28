@@ -270,18 +270,18 @@ public class PlayerAccountManager
         return new PlayerAccount(uuid, defaultBalance, balanceChangeTimestamp, true);
     }
 
-    public void unloadAccount(UUID uuid)
+    public boolean unloadAccount(UUID uuid)
     {
         PlayerAccount account = loadedAccounts.get(uuid);
 
         if (account == null)
         {
-            return;
+            return false;
         }
 
         synchronized (account)
         {
-            loadedAccounts.remove(uuid, account);
+            return loadedAccounts.remove(uuid, account);
         }
     }
 
