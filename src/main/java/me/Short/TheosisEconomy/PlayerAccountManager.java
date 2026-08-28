@@ -154,13 +154,13 @@ public class PlayerAccountManager
      * Loading and unloading
      */
 
-    public CompletableFuture<PlayerAccount> loadOrCreateAccount(UUID uuid, String name)
+    public CompletableFuture<Void> loadOrCreateAccount(UUID uuid, String name)
     {
         PlayerAccount loadedAccount = loadedAccounts.get(uuid);
 
         if (loadedAccount != null)
         {
-            return CompletableFuture.completedFuture(loadedAccount);
+            return CompletableFuture.completedFuture(null);
         }
 
         return submitDatabaseTask(() ->
@@ -183,9 +183,9 @@ public class PlayerAccountManager
                     }
                 }
 
-                PlayerAccount existingAccount = loadedAccounts.putIfAbsent(uuid, account);
+                loadedAccounts.putIfAbsent(uuid, account);
 
-                return existingAccount != null ? existingAccount : account;
+                return null;
             }
             catch (SQLException e)
             {
