@@ -3,6 +3,7 @@ package me.Short.TheosisEconomy.Listeners;
 import me.Short.TheosisEconomy.TheosisEconomy;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 
@@ -16,7 +17,7 @@ public class PlayerQuitListener implements Listener
         this.instance = instance;
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerQuit(PlayerQuitEvent event)
     {
         Player player = event.getPlayer();
