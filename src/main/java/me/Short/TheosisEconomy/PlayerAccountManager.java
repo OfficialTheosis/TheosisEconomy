@@ -9,7 +9,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -35,6 +37,10 @@ public class PlayerAccountManager
     private final DatabaseManager databaseManager;
 
     private final ConcurrentMap<UUID, PlayerAccount> loadedAccounts = new ConcurrentHashMap<>();
+
+    private final Map<UUID, Integer> accountConnectionCounts = new HashMap<>();
+
+    private final Object accountLifecycleLock = new Object();
 
     private volatile List<BalanceTopEntry> cachedBalanceTopEntries = List.of();
 
@@ -156,15 +162,28 @@ public class PlayerAccountManager
 
     public CompletableFuture<Void> loadOrCreateAccount(UUID uuid, String name)
     {
-        PlayerAccount loadedAccount = loadedAccounts.get(uuid);
-
-        if (loadedAccount != null)
+        synchronized (accountLifecycleLock)
         {
-            return CompletableFuture.completedFuture(null);
+            if (loadedAccounts.containsKey(uuid))
+            {
+                accountConnectionCounts.merge(uuid, 1, Integer::sum);
+
+                return CompletableFuture.completedFuture(null);
+            }
         }
 
         return submitDatabaseTask(() ->
         {
+            synchronized (accountLifecycleLock)
+            {
+                if (loadedAccounts.containsKey(uuid))
+                {
+                    accountConnectionCounts.merge(uuid, 1, Integer::sum);
+
+                    return null;
+                }
+            }
+
             try
             {
                 PlayerAccount account = loadAccountFromDatabase(uuid);
@@ -183,7 +202,19 @@ public class PlayerAccountManager
                     }
                 }
 
-                loadedAccounts.putIfAbsent(uuid, account);
+                synchronized (accountLifecycleLock)
+                {
+                    PlayerAccount existingAccount = loadedAccounts.putIfAbsent(uuid, account);
+
+                    if (existingAccount == null)
+                    {
+                        accountConnectionCounts.put(uuid, 1);
+                    }
+                    else
+                    {
+                        accountConnectionCounts.merge(uuid, 1, Integer::sum);
+                    }
+                }
 
                 return null;
             }
@@ -272,16 +303,35 @@ public class PlayerAccountManager
 
     public boolean unloadAccount(UUID uuid)
     {
-        PlayerAccount account = loadedAccounts.get(uuid);
-
-        if (account == null)
+        synchronized (accountLifecycleLock)
         {
-            return false;
-        }
+            Integer connectionCount = accountConnectionCounts.get(uuid);
 
-        synchronized (account)
-        {
-            return loadedAccounts.remove(uuid, account);
+            if (connectionCount == null)
+            {
+                return false;
+            }
+
+            if (connectionCount > 1)
+            {
+                accountConnectionCounts.put(uuid, connectionCount - 1);
+
+                return false;
+            }
+
+            accountConnectionCounts.remove(uuid);
+
+            PlayerAccount account = loadedAccounts.get(uuid);
+
+            if (account == null)
+            {
+                return false;
+            }
+
+            synchronized (account)
+            {
+                return loadedAccounts.remove(uuid, account);
+            }
         }
     }
 

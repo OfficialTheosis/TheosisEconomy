@@ -487,6 +487,9 @@ messages:
   # Generic error messages
   error:
 
+    # When a player is prevented from logging into or kicked from the server because their account could not be created or loaded
+    could-not-create-or-load-account: "<red>Your economy account could not be loaded, or one could not be created for you. Please try logging in again, or contact server staff if you keep seeing this message.</red>"
+
     # When an internal error occurs, such as an SQL exception preventing a payment with `/pay` from processing
     internal: "<red>An internal error occurred. Please contact server staff.</red>"
 

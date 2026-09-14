@@ -1,7 +1,6 @@
 package me.Short.TheosisEconomy.Listeners;
 
 import me.Short.TheosisEconomy.TheosisEconomy;
-import net.kyori.adventure.text.Component;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -34,7 +33,7 @@ public class AsyncPlayerPreLoginListener implements Listener
         }
         catch (CompletionException e)
         {
-            event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, Component.text("Your economy account could not be loaded, or one could not be created for you. Please try again."));
+            event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, instance.getMiniMessage().deserialize(instance.getConfigSnapshot().getString("messages.error.could-not-create-or-load-account")));
 
             instance.getLogger().log(Level.SEVERE, "Failed to load or create account for " + event.getName() + " (" + event.getUniqueId() + ").", e.getCause());
         }

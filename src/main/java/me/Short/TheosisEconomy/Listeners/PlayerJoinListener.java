@@ -1,7 +1,6 @@
 package me.Short.TheosisEconomy.Listeners;
 
 import me.Short.TheosisEconomy.TheosisEconomy;
-import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -28,7 +27,7 @@ public class PlayerJoinListener implements Listener
         // If the player's account is somehow not loaded, kick them
         if (!instance.getPlayerAccountManager().isAccountLoaded(uuid))
         {
-            player.kick(Component.text("Your economy account could not be loaded, or one could not be created for you. Please try again."));
+            player.kick(instance.getMiniMessage().deserialize(instance.getConfigSnapshot().getString("messages.error.could-not-create-or-load-account")));
 
             return;
         }
