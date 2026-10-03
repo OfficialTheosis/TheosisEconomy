@@ -257,7 +257,8 @@ public class EconomyCommand
                                 Placeholder.component("amount", resultingBalanceFormatted));
 
                         // Send message to the target player if online
-                        if (target instanceof Player onlineTarget)
+                        Player onlineTarget = target.getPlayer();
+                        if (onlineTarget != null)
                         {
                             messageSender.sendConfigMiniMessage(onlineTarget, MessageType.CHAT, "messages.economy.set.balance-set-target",
                                     Placeholder.component("amount", resultingBalanceFormatted));
@@ -342,7 +343,8 @@ public class EconomyCommand
                                 Placeholder.component("balance", resultingBalanceFormatted));
 
                         // Send message to the target player if online
-                        if (target instanceof Player onlineTarget)
+                        Player onlineTarget = target.getPlayer();
+                        if (onlineTarget != null)
                         {
                             messageSender.sendConfigMiniMessage(onlineTarget, MessageType.CHAT, "messages.economy.give.money-given-target",
                                     Placeholder.component("amount", amountFormatted),
@@ -428,7 +430,8 @@ public class EconomyCommand
                                 Placeholder.component("balance", resultingBalanceFormatted));
 
                         // Send message to the target player if online
-                        if (target instanceof Player onlineTarget)
+                        Player onlineTarget = target.getPlayer();
+                        if (onlineTarget != null)
                         {
                             messageSender.sendConfigMiniMessage(onlineTarget, MessageType.CHAT, "messages.economy.take.money-taken-target",
                                     Placeholder.component("amount", amountFormatted),
@@ -510,7 +513,8 @@ public class EconomyCommand
                                 Placeholder.component("balance", Component.text(resultingBalanceFormatted)));
 
                         // Send message to the target player if online
-                        if (target instanceof Player onlineTarget)
+                        Player onlineTarget = target.getPlayer();
+                        if (onlineTarget != null)
                         {
                             messageSender.sendConfigMiniMessage(onlineTarget, MessageType.CHAT, "messages.economy.reset.balance-reset-target",
                                     Placeholder.component("balance", Component.text(resultingBalanceFormatted)));

@@ -155,7 +155,8 @@ public class PayCommand
                                 Placeholder.component("amount", amountTransferredFormatted),
                                 Placeholder.component("balance", Component.text(Util.formatMoney(instance, senderResultingBalance))));
 
-                        if (target instanceof Player onlineTarget)
+                        Player onlineTarget = target.getPlayer();
+                        if (onlineTarget != null)
                         {
                             messageSender.sendConfigMiniMessage(onlineTarget, MessageType.CHAT, "messages.pay.paid-target",
                                     Placeholder.component("player", senderPlayer.name()),
