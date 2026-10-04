@@ -1308,7 +1308,7 @@ public class PlayerAccountManager
                         // The requested page exists
                         if (!entries.isEmpty())
                         {
-                            return CompletableFuture.completedFuture(new BalanceTopPage(normalisedPage, (long) (normalisedPage - 1) * normalisedEntriesPerPage + 1, entries));
+                            return CompletableFuture.completedFuture(new BalanceTopPage(normalisedPage, pageStart + 1, entries));
                         }
 
                         // The requested page looked possible based on the candidate count, but filters made it empty, so fall back to page 1
