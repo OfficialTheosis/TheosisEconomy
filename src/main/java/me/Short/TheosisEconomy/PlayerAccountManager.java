@@ -1348,7 +1348,7 @@ public class PlayerAccountManager
         }
     }
 
-    private List<BalanceTopEntry> getBalanceTopCandidatesFromDatabase(BigDecimal minimumBalance, int limit, BalanceTopEntry after) throws SQLException
+    private List<BalanceTopEntry> getBalanceTopCandidatesFromDatabase(BigDecimal minimumBalance, BalanceTopEntry after) throws SQLException
     {
         String sql;
 
@@ -1391,7 +1391,7 @@ public class PlayerAccountManager
 
             if (after == null)
             {
-                statement.setInt(2, limit);
+                statement.setInt(2, BALANCE_TOP_BATCH_SIZE);
             }
             else
             {
@@ -1403,7 +1403,7 @@ public class PlayerAccountManager
                 statement.setLong(5, afterBalance);
                 statement.setLong(6, after.lastBalanceChangeTimestamp());
                 statement.setString(7, after.uuid().toString());
-                statement.setInt(8, limit);
+                statement.setInt(8, BALANCE_TOP_BATCH_SIZE);
             }
 
             List<BalanceTopEntry> entries = new ArrayList<>();
@@ -1451,7 +1451,7 @@ public class PlayerAccountManager
         {
             try
             {
-                return getBalanceTopCandidatesFromDatabase(minimumBalance, BALANCE_TOP_BATCH_SIZE, after);
+                return getBalanceTopCandidatesFromDatabase(minimumBalance, after);
             }
             catch (SQLException e)
             {
