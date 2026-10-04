@@ -37,7 +37,7 @@ public class MessageSender
                 }
                 else
                 {
-                    player.getScheduler().execute(instance, sendMessageLogic, null, 0L);
+                    player.getScheduler().execute(instance, sendMessageLogic, null, 1L);
                 }
             }
             else

@@ -102,7 +102,7 @@ public class BalanceCommand
 
             Runnable fallback = () -> Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
 
-            if (senderScheduler == null || !senderScheduler.execute(instance, commandLogic, fallback, 0L))
+            if (senderScheduler == null || !senderScheduler.execute(instance, commandLogic, fallback, 1L))
             {
                 fallback.run();
             }

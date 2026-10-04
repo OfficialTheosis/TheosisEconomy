@@ -206,7 +206,7 @@ public class PayCommand
 
             Runnable fallback = () -> Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
 
-            if (!senderPlayerScheduler.execute(instance, commandLogic, fallback, 0L))
+            if (!senderPlayerScheduler.execute(instance, commandLogic, fallback, 1L))
             {
                 fallback.run();
             }
