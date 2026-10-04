@@ -7,6 +7,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import me.Short.TheosisEconomy.BalanceTopEntry;
+import me.Short.TheosisEconomy.BalanceTopPage;
 import me.Short.TheosisEconomy.ConfigSnapshot;
 import me.Short.TheosisEconomy.MessageSender;
 import me.Short.TheosisEconomy.MessageType;
@@ -25,6 +26,7 @@ import org.bukkit.entity.Player;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
 
@@ -98,7 +100,32 @@ public class BalanceTopCommand
 
         messageSender.sendConfigMiniMessage(sender, MessageType.CHAT, "messages.balancetop.fetching");
 
-        playerAccountManager.getBalanceTop(pageNumber).whenComplete((balanceTopPage, throwable) ->
+        CompletableFuture<BalanceTopPage> getBalanceTopPageFuture;
+
+        try
+        {
+            getBalanceTopPageFuture = playerAccountManager.getBalanceTop(pageNumber);
+        }
+        catch (RuntimeException e)
+        {
+            if (senderUuid != null)
+            {
+                activeBalanceTopRequests.remove(senderUuid);
+            }
+
+            if (!senderShouldBypassRequestLimit)
+            {
+                balanceTopRequestPermits.release();
+            }
+
+            instance.getLogger().log(Level.SEVERE, "Failed to start balance top page lookup.", e);
+
+            messageSender.sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.internal");
+
+            return;
+        }
+
+        getBalanceTopPageFuture.whenComplete((balanceTopPage, throwable) ->
         {
             if (senderUuid != null)
             {
@@ -134,13 +161,11 @@ public class BalanceTopCommand
                 ConfigSnapshot config = instance.getConfigSnapshot();
                 MiniMessage miniMessage = instance.getMiniMessage();
 
-                int entriesPerPage = config.getInt("settings.balancetop.entries-per-page");
-
                 int page = balanceTopPage.page();
 
                 // Initial output (header)
                 Component output = miniMessage.deserialize(config.getString("settings.balancetop.header-format"),
-                        Placeholder.component("page", Component.text(page)));
+                        Placeholder.component("page", Component.text(String.format("%,d", page))));
 
                 for (int i = 0; i < entries.size(); i++)
                 {
@@ -152,7 +177,7 @@ public class BalanceTopCommand
 
                     String entryFormat = config.getString(entryUuid.equals(senderUuid) ? "settings.balancetop.entry-format-sender" : "settings.balancetop.entry-format");
 
-                    TagResolver positionPlaceholder = Placeholder.component("position", Component.text((long) (page - 1) * entriesPerPage + i + 1));
+                    TagResolver positionPlaceholder = Placeholder.component("position", Component.text(String.format("%,d", balanceTopPage.startPosition() + i)));
                     TagResolver playerPlaceholder = Placeholder.component("player", Component.text(playerName != null ? playerName : entryUuid.toString()));
                     TagResolver balancePlaceholder = Placeholder.component("balance", Component.text(Util.formatMoney(instance, entry.balance())));
 
@@ -162,22 +187,12 @@ public class BalanceTopCommand
                     {
                         boolean forPlayer = senderUuid != null;
 
-                        output = output.appendNewline().append(miniMessage.deserialize(
-                                entryFormat,
-                                positionPlaceholder,
-                                playerPlaceholder,
-                                balancePlaceholder,
-                                Placeholder.component("dots", Component.text(".".repeat(Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(miniMessage.deserialize(entryFormat.substring(0, dotsPlaceholderIndex),
-                                        positionPlaceholder,
-                                        playerPlaceholder,
-                                        balancePlaceholder)), forPlayer, config.getInt(forPlayer ? "settings.balancetop.entry-dot-alignment-width.players" : "settings.balancetop.entry-dot-alignment-width.console")))))));
+                        output = output.appendNewline().append(miniMessage.deserialize(entryFormat, positionPlaceholder, playerPlaceholder, balancePlaceholder,
+                                Placeholder.component("dots", Component.text(".".repeat(Util.getNumberOfDotsToAlign(PlainTextComponentSerializer.plainText().serialize(miniMessage.deserialize(entryFormat.substring(0, dotsPlaceholderIndex), positionPlaceholder, playerPlaceholder, balancePlaceholder)), forPlayer, config.getInt(forPlayer ? "settings.balancetop.entry-dot-alignment-width.players" : "settings.balancetop.entry-dot-alignment-width.console")))))));
                     }
                     else
                     {
-                        output = output.appendNewline().append(miniMessage.deserialize(entryFormat,
-                                positionPlaceholder,
-                                playerPlaceholder,
-                                balancePlaceholder));
+                        output = output.appendNewline().append(miniMessage.deserialize(entryFormat, positionPlaceholder, playerPlaceholder, balancePlaceholder));
                     }
                 }
 

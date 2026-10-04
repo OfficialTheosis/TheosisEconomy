@@ -1278,7 +1278,7 @@ public class PlayerAccountManager
         // Page 1 never needs the candidate-count check
         if (normalisedPage == 1)
         {
-            return getBalanceTopPage(1, normalisedEntriesPerPage, minimumBalance, considerExcludePermission).thenApply(entries -> new BalanceTopPage(1, entries));
+            return getBalanceTopPage(1, normalisedEntriesPerPage, minimumBalance, considerExcludePermission).thenApply(entries -> new BalanceTopPage(1, 1L, entries));
         }
 
         long pageStart = (long) (normalisedPage - 1) * normalisedEntriesPerPage;
@@ -1299,7 +1299,7 @@ public class PlayerAccountManager
             if (pageStart >= candidateCount)
             {
                 return getBalanceTopPage(1, normalisedEntriesPerPage, minimumBalance, considerExcludePermission)
-                        .thenApply(entries -> new BalanceTopPage(1, entries));
+                        .thenApply(entries -> new BalanceTopPage(1, 1L, entries));
             }
 
             return getBalanceTopPage(normalisedPage, normalisedEntriesPerPage, minimumBalance, considerExcludePermission)
@@ -1308,12 +1308,11 @@ public class PlayerAccountManager
                         // The requested page exists
                         if (!entries.isEmpty())
                         {
-                            return CompletableFuture.completedFuture(new BalanceTopPage(normalisedPage, entries));
+                            return CompletableFuture.completedFuture(new BalanceTopPage(normalisedPage, (long) (normalisedPage - 1) * normalisedEntriesPerPage + 1, entries));
                         }
 
                         // The requested page looked possible based on the candidate count, but filters made it empty, so fall back to page 1
-                        return getBalanceTopPage(1, normalisedEntriesPerPage, minimumBalance, considerExcludePermission)
-                                .thenApply(firstPageEntries -> new BalanceTopPage(1, firstPageEntries));
+                        return getBalanceTopPage(1, normalisedEntriesPerPage, minimumBalance, considerExcludePermission).thenApply(firstPageEntries -> new BalanceTopPage(1, 1L, firstPageEntries));
                     });
         });
     }
