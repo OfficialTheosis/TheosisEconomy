@@ -5,7 +5,6 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.threadedregions.scheduler.EntityScheduler;
 import me.Short.TheosisEconomy.CustomCommandArguments.CachedOfflinePlayerArgument;
 import me.Short.TheosisEconomy.MessageType;
 import me.Short.TheosisEconomy.TheosisEconomy;
@@ -71,13 +70,11 @@ public class BalanceCommand
         UUID targetUuid = target.getUniqueId();
         String targetName = target.getName();
 
-        EntityScheduler senderScheduler = sender instanceof Player senderPlayer ? senderPlayer.getScheduler() : null;
-
         instance.getPlayerAccountManager().getBalance(targetUuid).whenComplete((balance, throwable) ->
         {
             if (throwable != null)
             {
-                instance.getLogger().log(Level.SEVERE, "Failed to get balance of " + (targetName != null ? targetName : targetUuid.toString()) + "(" + targetUuid + ").", throwable);
+                instance.getLogger().log(Level.SEVERE, "Failed to get balance of " + targetName + "(" + targetUuid + ").", throwable);
 
                 instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.internal");
 
@@ -100,11 +97,13 @@ public class BalanceCommand
                         Placeholder.component("balance", Component.text(Util.formatMoney(instance, balance))));
             };
 
-            Runnable fallback = () -> Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
-
-            if (senderScheduler == null || !senderScheduler.execute(instance, commandLogic, fallback, 1L))
+            if (sender instanceof Player senderPlayer)
             {
-                fallback.run();
+                senderPlayer.getScheduler().execute(instance, commandLogic, null, 1L);
+            }
+            else
+            {
+                Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
             }
         });
     }

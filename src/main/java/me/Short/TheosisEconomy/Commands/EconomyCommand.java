@@ -6,7 +6,6 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.threadedregions.scheduler.EntityScheduler;
 import me.Short.TheosisEconomy.ConfigSnapshot;
 import me.Short.TheosisEconomy.CustomCommandArguments.CachedOfflinePlayerArgument;
 import me.Short.TheosisEconomy.MessageSender;
@@ -212,8 +211,6 @@ public class EconomyCommand
 
         UUID targetUuid = target.getUniqueId();
 
-        EntityScheduler senderScheduler = sender instanceof Player senderPlayer ? senderPlayer.getScheduler() : null;
-
         instance.getPlayerAccountManager().setBalance(targetUuid, BigDecimal.valueOf(amount)).whenComplete((balanceChange, throwable) ->
         {
             String targetName = target.getName();
@@ -221,7 +218,7 @@ public class EconomyCommand
             // If an SQL exception was thrown, log it and send a generic internal error message to the player
             if (throwable != null)
             {
-                instance.getLogger().log(Level.SEVERE, "Failed to set balance of " + (targetName != null ? targetName : targetUuid.toString()) + "(" + targetUuid + ").", throwable);
+                instance.getLogger().log(Level.SEVERE, "Failed to set balance of " + targetName + "(" + targetUuid + ").", throwable);
 
                 instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.internal");
 
@@ -279,11 +276,13 @@ public class EconomyCommand
                 }
             };
 
-            Runnable fallback = () -> Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
-
-            if (senderScheduler == null || !senderScheduler.execute(instance, commandLogic, fallback, 1L))
+            if (sender instanceof Player senderPlayer)
             {
-                fallback.run();
+                senderPlayer.getScheduler().execute(instance, commandLogic, null, 1L);
+            }
+            else
+            {
+                Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
             }
         });
     }
@@ -295,15 +294,13 @@ public class EconomyCommand
 
         UUID targetUuid = target.getUniqueId();
 
-        EntityScheduler senderScheduler = sender instanceof Player senderPlayer ? senderPlayer.getScheduler() : null;
-
         instance.getPlayerAccountManager().addToBalance(targetUuid, BigDecimal.valueOf(amount)).whenComplete((balanceChange, throwable) ->
         {
             String targetName = target.getName();
 
             if (throwable != null)
             {
-                instance.getLogger().log(Level.SEVERE, "Failed to set balance of " + (targetName != null ? targetName : targetUuid.toString()) + "(" + targetUuid + ").", throwable);
+                instance.getLogger().log(Level.SEVERE, "Failed to set balance of " + targetName + "(" + targetUuid + ").", throwable);
 
                 instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.internal");
 
@@ -366,11 +363,13 @@ public class EconomyCommand
                 }
             };
 
-            Runnable fallback = () -> Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
-
-            if (senderScheduler == null || !senderScheduler.execute(instance, commandLogic, fallback, 1L))
+            if (sender instanceof Player senderPlayer)
             {
-                fallback.run();
+                senderPlayer.getScheduler().execute(instance, commandLogic, null, 1L);
+            }
+            else
+            {
+                Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
             }
         });
     }
@@ -382,15 +381,13 @@ public class EconomyCommand
 
         UUID targetUuid = target.getUniqueId();
 
-        EntityScheduler senderScheduler = sender instanceof Player senderPlayer ? senderPlayer.getScheduler() : null;
-
         instance.getPlayerAccountManager().subtractFromBalance(targetUuid, BigDecimal.valueOf(amount)).whenComplete((balanceChange, throwable) ->
         {
             String targetName = target.getName();
 
             if (throwable != null)
             {
-                instance.getLogger().log(Level.SEVERE, "Failed to set balance of " + (targetName != null ? targetName : targetUuid.toString()) + "(" + targetUuid + ").", throwable);
+                instance.getLogger().log(Level.SEVERE, "Failed to set balance of " + targetName + "(" + targetUuid + ").", throwable);
 
                 instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.internal");
 
@@ -453,11 +450,13 @@ public class EconomyCommand
                 }
             };
 
-            Runnable fallback = () -> Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
-
-            if (senderScheduler == null || !senderScheduler.execute(instance, commandLogic, fallback, 1L))
+            if (sender instanceof Player senderPlayer)
             {
-                fallback.run();
+                senderPlayer.getScheduler().execute(instance, commandLogic, null, 1L);
+            }
+            else
+            {
+                Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
             }
         });
     }
@@ -471,15 +470,13 @@ public class EconomyCommand
 
         UUID targetUuid = target.getUniqueId();
 
-        EntityScheduler senderScheduler = sender instanceof Player senderPlayer ? senderPlayer.getScheduler() : null;
-
         instance.getPlayerAccountManager().setBalance(targetUuid, BigDecimal.valueOf(config.getDouble("settings.currency.default-balance"))).whenComplete((balanceChange, throwable) ->
         {
             String targetName = target.getName();
 
             if (throwable != null)
             {
-                instance.getLogger().log(Level.SEVERE, "Failed to set balance of " + (targetName != null ? targetName : targetUuid.toString()) + "(" + targetUuid + ").", throwable);
+                instance.getLogger().log(Level.SEVERE, "Failed to set balance of " + targetName + "(" + targetUuid + ").", throwable);
 
                 instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.error.internal");
 
@@ -535,11 +532,13 @@ public class EconomyCommand
                 }
             };
 
-            Runnable fallback = () -> Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
-
-            if (senderScheduler == null || !senderScheduler.execute(instance, commandLogic, fallback, 1L))
+            if (sender instanceof Player senderPlayer)
             {
-                fallback.run();
+                senderPlayer.getScheduler().execute(instance, commandLogic, null, 1L);
+            }
+            else
+            {
+                Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
             }
         });
     }

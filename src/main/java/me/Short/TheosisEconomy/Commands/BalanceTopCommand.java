@@ -6,7 +6,6 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.threadedregions.scheduler.EntityScheduler;
 import me.Short.TheosisEconomy.BalanceTopEntry;
 import me.Short.TheosisEconomy.ConfigSnapshot;
 import me.Short.TheosisEconomy.MessageSender;
@@ -99,8 +98,6 @@ public class BalanceTopCommand
 
         messageSender.sendConfigMiniMessage(sender, MessageType.CHAT, "messages.balancetop.fetching");
 
-        EntityScheduler senderScheduler = sender instanceof Player senderPlayer ? senderPlayer.getScheduler() : null;
-
         playerAccountManager.getBalanceTop(pageNumber).whenComplete((balanceTopPage, throwable) ->
         {
             if (senderUuid != null)
@@ -188,11 +185,13 @@ public class BalanceTopCommand
                 messageSender.sendMessage(sender, MessageType.CHAT, output);
             };
 
-            Runnable fallback = () -> Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
-
-            if (senderScheduler == null || !senderScheduler.execute(instance, commandLogic, fallback, 1L))
+            if (sender instanceof Player senderPlayer)
             {
-                fallback.run();
+                senderPlayer.getScheduler().execute(instance, commandLogic, null, 1L);
+            }
+            else
+            {
+                Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
             }
         });
     }

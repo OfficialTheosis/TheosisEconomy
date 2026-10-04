@@ -6,7 +6,6 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-import io.papermc.paper.threadedregions.scheduler.EntityScheduler;
 import me.Short.TheosisEconomy.ConfigSnapshot;
 import me.Short.TheosisEconomy.CustomCommandArguments.CachedOfflinePlayerArgument;
 import me.Short.TheosisEconomy.MessageSender;
@@ -15,7 +14,6 @@ import me.Short.TheosisEconomy.TheosisEconomy;
 import me.Short.TheosisEconomy.Util;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -106,8 +104,6 @@ public class PayCommand
         UUID senderUuid = senderPlayer.getUniqueId();
         UUID targetUuid = target.getUniqueId();
 
-        EntityScheduler senderPlayerScheduler = senderPlayer.getScheduler();
-
         instance.getPlayerAccountManager().transferMoney(senderUuid, targetUuid, BigDecimal.valueOf(amount)).whenComplete((moneyTransfer, throwable) ->
         {
             // If an SQL exception was thrown, log it and send a generic internal error message to the player
@@ -120,7 +116,7 @@ public class PayCommand
                 return;
             }
 
-            Runnable commandLogic = () ->
+            senderPlayer.getScheduler().execute(instance, () ->
             {
                 switch (moneyTransfer.result())
                 {
@@ -202,14 +198,7 @@ public class PayCommand
                                 Placeholder.component("max_balance", Component.text(Util.formatMoney(instance, BigDecimal.valueOf(instance.getConfigSnapshot().getDouble("settings.currency.max-balance"))))));
                     }
                 }
-            };
-
-            Runnable fallback = () -> Bukkit.getGlobalRegionScheduler().execute(instance, commandLogic);
-
-            if (!senderPlayerScheduler.execute(instance, commandLogic, fallback, 1L))
-            {
-                fallback.run();
-            }
+            }, null, 1L);
         });
     }
 
