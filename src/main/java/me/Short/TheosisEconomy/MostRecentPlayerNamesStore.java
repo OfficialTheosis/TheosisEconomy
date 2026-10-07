@@ -1,5 +1,6 @@
 package me.Short.TheosisEconomy;
 
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -30,47 +31,6 @@ public class MostRecentPlayerNamesStore
         this.limit = Math.max(0, limit);
 
         load();
-    }
-
-    // Add a player to the map, causing the oldest one to get removed if it exceeds the limit
-    public synchronized void add(UUID uuid, String username)
-    {
-        // Ensure every update has a strictly increasing timestamp, even if multiple updates happen in the same millisecond
-        long timestamp = Math.max(System.currentTimeMillis(), mostRecentTimestamp + 1);
-
-        mostRecentTimestamp = timestamp;
-
-        mostRecentPlayerNames.remove(uuid);
-        mostRecentPlayerNames.put(uuid, username);
-
-        UUID removedUuid = null;
-
-        if (mostRecentPlayerNames.size() > limit)
-        {
-            removedUuid = mostRecentPlayerNames.keySet().iterator().next();
-            mostRecentPlayerNames.remove(removedUuid);
-        }
-
-        updateSnapshot();
-
-        UUID finalRemovedUuid = removedUuid;
-
-        databaseManager.executeTask(() ->
-        {
-            try
-            {
-                upsertPlayerNameInDatabase(uuid, username, timestamp);
-
-                if (finalRemovedUuid != null)
-                {
-                    deletePlayerNameFromDatabase(finalRemovedUuid);
-                }
-            }
-            catch (SQLException e)
-            {
-                instance.getLogger().log(Level.WARNING, "Failed to save most recent player name.", e);
-            }
-        });
     }
 
     // Load the most recent player names from the database
@@ -121,6 +81,47 @@ public class MostRecentPlayerNamesStore
         }
     }
 
+    // Add a player to the map, causing the oldest one to get removed if it exceeds the limit
+    public synchronized void add(UUID uuid, String username)
+    {
+        // Ensure every update has a strictly increasing timestamp, even if multiple updates happen in the same millisecond
+        long timestamp = Math.max(System.currentTimeMillis(), mostRecentTimestamp + 1);
+
+        int currentLimit = limit;
+
+        try
+        {
+            databaseManager.executeTask(() ->
+            {
+                try
+                {
+                    upsertPlayerNameAndTrimDatabase(uuid, username, timestamp, currentLimit);
+                }
+                catch (SQLException | RuntimeException e)
+                {
+                    instance.getLogger().log(Level.WARNING, "Failed to save most recent player name.", e);
+                }
+            });
+        }
+        catch (IllegalStateException ignored)
+        {
+            return;
+        }
+
+        // These cache updates only happen if the database task was accepted
+        mostRecentTimestamp = timestamp;
+
+        mostRecentPlayerNames.remove(uuid);
+        mostRecentPlayerNames.put(uuid, username);
+
+        while (mostRecentPlayerNames.size() > currentLimit)
+        {
+            mostRecentPlayerNames.remove(mostRecentPlayerNames.keySet().iterator().next());
+        }
+
+        updateSnapshot();
+    }
+
     // Insert or update a player's cached username
     private void upsertPlayerNameInDatabase(UUID uuid, String username, long timestamp) throws SQLException
     {
@@ -147,19 +148,37 @@ public class MostRecentPlayerNamesStore
         }
     }
 
-    // Remove an evicted player name from the database
-    private void deletePlayerNameFromDatabase(UUID uuid) throws SQLException
+    private void upsertPlayerNameAndTrimDatabase(UUID uuid, String username, long timestamp, int limit) throws SQLException
     {
-        String sql = """
-            DELETE FROM most_recent_player_names
-            WHERE uuid = ?;
-            """;
+        Connection connection = databaseManager.getConnection();
 
-        try (PreparedStatement statement = databaseManager.getConnection().prepareStatement(sql))
+        boolean previousAutoCommit = connection.getAutoCommit();
+
+        try
         {
-            statement.setString(1, uuid.toString());
+            connection.setAutoCommit(false);
 
-            statement.executeUpdate();
+            upsertPlayerNameInDatabase(uuid, username, timestamp);
+            trimDatabaseToLimit(limit);
+
+            connection.commit();
+        }
+        catch (SQLException | RuntimeException e)
+        {
+            try
+            {
+                connection.rollback();
+            }
+            catch (SQLException rollbackException)
+            {
+                e.addSuppressed(rollbackException);
+            }
+
+            throw e;
+        }
+        finally
+        {
+            connection.setAutoCommit(previousAutoCommit);
         }
     }
 
@@ -198,28 +217,36 @@ public class MostRecentPlayerNamesStore
 
     public synchronized void setLimit(int limit)
     {
-        limit = Math.max(0, limit);
-        this.limit = limit;
+        int newLimit = Math.max(0, limit);
 
-        while (mostRecentPlayerNames.size() > limit)
+        try
+        {
+            databaseManager.executeTask(() ->
+            {
+                try
+                {
+                    trimDatabaseToLimit(newLimit);
+                }
+                catch (SQLException | RuntimeException e)
+                {
+                    instance.getLogger().log(Level.WARNING, "Failed to trim most recent player names.", e);
+                }
+            });
+        }
+        catch (IllegalStateException ignored)
+        {
+            return;
+        }
+
+        // These cache updates only happen if the database task was accepted
+        this.limit = newLimit;
+
+        while (mostRecentPlayerNames.size() > newLimit)
         {
             mostRecentPlayerNames.remove(mostRecentPlayerNames.keySet().iterator().next());
         }
 
         updateSnapshot();
-
-        int finalLimit = limit;
-        databaseManager.executeTask(() ->
-        {
-            try
-            {
-                trimDatabaseToLimit(finalLimit);
-            }
-            catch (SQLException e)
-            {
-                instance.getLogger().log(Level.WARNING, "Failed to trim most recent player names.", e);
-            }
-        });
     }
 
 }
