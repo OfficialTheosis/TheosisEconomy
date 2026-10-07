@@ -160,7 +160,7 @@ public class PlayerAccountManager
      * Loading and unloading
      */
 
-    public CompletableFuture<Void> loadOrCreateAccount(UUID uuid, String name)
+    public void loadOrCreateAccount(UUID uuid, String name)
     {
         synchronized (accountLifecycleLock)
         {
@@ -168,61 +168,40 @@ public class PlayerAccountManager
             {
                 accountConnectionCounts.merge(uuid, 1, Integer::sum);
 
-                return CompletableFuture.completedFuture(null);
+                return;
             }
+
+            PlayerAccount account = submitDatabaseTask(() ->
+            {
+                try
+                {
+                    PlayerAccount loadedAccount = loadAccountFromDatabase(uuid);
+
+                    if (loadedAccount == null)
+                    {
+                        loadedAccount = createAccountInDatabase(uuid);
+
+                        ConfigSnapshot config = instance.getConfigSnapshot();
+
+                        if (config.getBoolean("settings.activity-logging.account-create.log"))
+                        {
+                            instance.getActivityLogger().log(Level.INFO, config.getString("settings.activity-logging.account-create.message")
+                                            .replace("<player>", name)
+                                            .replace("<uuid>", uuid.toString()));
+                        }
+                    }
+
+                    return loadedAccount;
+                }
+                catch (SQLException e)
+                {
+                    throw new CompletionException(e);
+                }
+            }).join();
+
+            loadedAccounts.put(uuid, account);
+            accountConnectionCounts.put(uuid, 1);
         }
-
-        return submitDatabaseTask(() ->
-        {
-            synchronized (accountLifecycleLock)
-            {
-                if (loadedAccounts.containsKey(uuid))
-                {
-                    accountConnectionCounts.merge(uuid, 1, Integer::sum);
-
-                    return null;
-                }
-            }
-
-            try
-            {
-                PlayerAccount account = loadAccountFromDatabase(uuid);
-
-                if (account == null)
-                {
-                    account = createAccountInDatabase(uuid);
-
-                    ConfigSnapshot config = instance.getConfigSnapshot();
-
-                    if (config.getBoolean("settings.activity-logging.account-create.log"))
-                    {
-                        instance.getActivityLogger().log(Level.INFO, config.getString("settings.activity-logging.account-create.message")
-                                .replace("<player>", name)
-                                .replace("<uuid>", uuid.toString()));
-                    }
-                }
-
-                synchronized (accountLifecycleLock)
-                {
-                    PlayerAccount existingAccount = loadedAccounts.putIfAbsent(uuid, account);
-
-                    if (existingAccount == null)
-                    {
-                        accountConnectionCounts.put(uuid, 1);
-                    }
-                    else
-                    {
-                        accountConnectionCounts.merge(uuid, 1, Integer::sum);
-                    }
-                }
-
-                return null;
-            }
-            catch (SQLException e)
-            {
-                throw new CompletionException(e);
-            }
-        });
     }
 
     private PlayerAccount loadAccountFromDatabase(UUID uuid) throws SQLException
@@ -691,192 +670,199 @@ public class PlayerAccountManager
             return CompletableFuture.completedFuture(balanceChange);
         }
 
-        return submitDatabaseTask(() ->
+        synchronized (accountLifecycleLock)
         {
-            BalanceChange newlyLoadedAccountBalanceChange = addToLoadedAccountBalance(uuid, amount); // The player's account may have become loaded while this task was waiting in the database executor
+            balanceChange = addToLoadedAccountBalance(uuid, amount);
 
-            if (newlyLoadedAccountBalanceChange.result() != BalanceChangeResult.ACCOUNT_NOT_FOUND)
+            if (balanceChange.result() != BalanceChangeResult.ACCOUNT_NOT_FOUND)
             {
-                return newlyLoadedAccountBalanceChange;
+                return CompletableFuture.completedFuture(balanceChange);
             }
 
-            // Update the balance in the database
-            try
+            return submitDatabaseTask(() ->
             {
-                BigDecimal currentBalance = getBalanceFromDatabase(uuid);
-
-                if (currentBalance == null)
+                try
                 {
-                    return new BalanceChange(BalanceChangeResult.ACCOUNT_NOT_FOUND, amount, null);
+                    BigDecimal currentBalance = getBalanceFromDatabase(uuid);
+
+                    if (currentBalance == null)
+                    {
+                        return new BalanceChange(BalanceChangeResult.ACCOUNT_NOT_FOUND, amount, null);
+                    }
+
+                    ConfigSnapshot config = instance.getConfigSnapshot();
+
+                    int decimalPlaces = instance.getDecimalPlaces();
+
+                    BigDecimal newAmount = Util.round(amount, decimalPlaces, RoundingMode.valueOf(config.getString("settings.currency.rounding-mode"))).stripTrailingZeros();
+
+                    if (newAmount.compareTo(BigDecimal.ZERO) <= 0)
+                    {
+                        return new BalanceChange(BalanceChangeResult.ZERO_OR_LESS_AMOUNT, newAmount, currentBalance);
+                    }
+
+                    if (newAmount.scale() > decimalPlaces)
+                    {
+                        return new BalanceChange(BalanceChangeResult.TOO_MANY_DECIMAL_PLACES_AMOUNT, newAmount, currentBalance);
+                    }
+
+                    BigDecimal newBalance = currentBalance.add(newAmount);
+
+                    if (newBalance.compareTo(new BigDecimal(config.getString("settings.currency.max-balance"))) > 0)
+                    {
+                        return new BalanceChange(BalanceChangeResult.ABOVE_MAXIMUM_BALANCE, newAmount, currentBalance);
+                    }
+
+                    if (!setBalanceInDatabase(uuid, newBalance, System.currentTimeMillis()))
+                    {
+                        return new BalanceChange(BalanceChangeResult.ACCOUNT_NOT_FOUND, newAmount, currentBalance);
+                    }
+
+                    return new BalanceChange(BalanceChangeResult.SUCCESS, newAmount, newBalance);
                 }
-
-                ConfigSnapshot config = instance.getConfigSnapshot();
-
-                int decimalPlaces = instance.getDecimalPlaces();
-
-                BigDecimal newAmount = Util.round(amount, decimalPlaces, RoundingMode.valueOf(config.getString("settings.currency.rounding-mode"))).stripTrailingZeros();
-
-                if (newAmount.compareTo(BigDecimal.ZERO) <= 0)
+                catch (SQLException e)
                 {
-                    return new BalanceChange(BalanceChangeResult.ZERO_OR_LESS_AMOUNT, newAmount, currentBalance);
+                    throw new CompletionException(e);
                 }
-
-                if (newAmount.scale() > decimalPlaces)
-                {
-                    return new BalanceChange(BalanceChangeResult.TOO_MANY_DECIMAL_PLACES_AMOUNT, newAmount, currentBalance);
-                }
-
-                BigDecimal newBalance = currentBalance.add(newAmount);
-
-                if (newBalance.compareTo(new BigDecimal(instance.getConfigSnapshot().getString("settings.currency.max-balance"))) > 0)
-                {
-                    return new BalanceChange(BalanceChangeResult.ABOVE_MAXIMUM_BALANCE, newAmount, currentBalance);
-                }
-
-                if (!setBalanceInDatabase(uuid, newBalance, System.currentTimeMillis()))
-                {
-                    return new BalanceChange(BalanceChangeResult.ACCOUNT_NOT_FOUND, newAmount, currentBalance);
-                }
-
-                return new BalanceChange(BalanceChangeResult.SUCCESS, newAmount, newBalance);
-            }
-            catch (SQLException e)
-            {
-                throw new CompletionException(e);
-            }
-        });
+            });
+        }
     }
 
     public CompletableFuture<BalanceChange> subtractFromBalance(UUID uuid, BigDecimal amount)
     {
-        BalanceChange loadedAccountBalanceChange = subtractFromLoadedAccountBalance(uuid, amount);
+        BalanceChange balanceChange = subtractFromLoadedAccountBalance(uuid, amount);
 
-        if (loadedAccountBalanceChange.result() != BalanceChangeResult.ACCOUNT_NOT_FOUND)
+        if (balanceChange.result() != BalanceChangeResult.ACCOUNT_NOT_FOUND)
         {
-            return CompletableFuture.completedFuture(loadedAccountBalanceChange);
+            return CompletableFuture.completedFuture(balanceChange);
         }
 
-        return submitDatabaseTask(() ->
+        synchronized (accountLifecycleLock)
         {
-            BalanceChange newlyLoadedAccountBalanceChange = subtractFromLoadedAccountBalance(uuid, amount); // The player's account may have become loaded while this task was waiting in the database executor
+            balanceChange = subtractFromLoadedAccountBalance(uuid, amount);
 
-            if (newlyLoadedAccountBalanceChange.result() != BalanceChangeResult.ACCOUNT_NOT_FOUND)
+            if (balanceChange.result() != BalanceChangeResult.ACCOUNT_NOT_FOUND)
             {
-                return newlyLoadedAccountBalanceChange;
+                return CompletableFuture.completedFuture(balanceChange);
             }
 
-            // Update the balance in the database
-            try
+            return submitDatabaseTask(() ->
             {
-                BigDecimal currentBalance = getBalanceFromDatabase(uuid);
-
-                if (currentBalance == null)
+                try
                 {
-                    return new BalanceChange(BalanceChangeResult.ACCOUNT_NOT_FOUND, amount, null);
+                    BigDecimal currentBalance = getBalanceFromDatabase(uuid);
+
+                    if (currentBalance == null)
+                    {
+                        return new BalanceChange(BalanceChangeResult.ACCOUNT_NOT_FOUND, amount, null);
+                    }
+
+                    ConfigSnapshot config = instance.getConfigSnapshot();
+
+                    int decimalPlaces = instance.getDecimalPlaces();
+
+                    BigDecimal newAmount = Util.round(amount, decimalPlaces, RoundingMode.valueOf(config.getString("settings.currency.rounding-mode"))).stripTrailingZeros();
+
+                    if (newAmount.compareTo(BigDecimal.ZERO) <= 0)
+                    {
+                        return new BalanceChange(BalanceChangeResult.ZERO_OR_LESS_AMOUNT, newAmount, currentBalance);
+                    }
+
+                    if (newAmount.scale() > decimalPlaces)
+                    {
+                        return new BalanceChange(BalanceChangeResult.TOO_MANY_DECIMAL_PLACES_AMOUNT, newAmount, currentBalance);
+                    }
+
+                    BigDecimal newBalance = currentBalance.subtract(newAmount);
+
+                    if (newBalance.compareTo(BigDecimal.ZERO) < 0)
+                    {
+                        return new BalanceChange(BalanceChangeResult.INSUFFICIENT_FUNDS, newAmount, currentBalance);
+                    }
+
+                    if (!setBalanceInDatabase(uuid, newBalance, System.currentTimeMillis()))
+                    {
+                        return new BalanceChange(BalanceChangeResult.ACCOUNT_NOT_FOUND, newAmount, currentBalance);
+                    }
+
+                    return new BalanceChange(BalanceChangeResult.SUCCESS, newAmount, newBalance);
                 }
-
-                ConfigSnapshot config = instance.getConfigSnapshot();
-
-                int decimalPlaces = instance.getDecimalPlaces();
-
-                BigDecimal newAmount = Util.round(amount, decimalPlaces, RoundingMode.valueOf(config.getString("settings.currency.rounding-mode"))).stripTrailingZeros();
-
-                if (newAmount.compareTo(BigDecimal.ZERO) <= 0)
+                catch (SQLException e)
                 {
-                    return new BalanceChange(BalanceChangeResult.ZERO_OR_LESS_AMOUNT, newAmount, currentBalance);
+                    throw new CompletionException(e);
                 }
-
-                if (newAmount.scale() > decimalPlaces)
-                {
-                    return new BalanceChange(BalanceChangeResult.TOO_MANY_DECIMAL_PLACES_AMOUNT, newAmount, currentBalance);
-                }
-
-                BigDecimal newBalance = currentBalance.subtract(newAmount);
-
-                if (newBalance.compareTo(BigDecimal.ZERO) < 0)
-                {
-                    return new BalanceChange(BalanceChangeResult.INSUFFICIENT_FUNDS, newAmount, currentBalance);
-                }
-
-                if (!setBalanceInDatabase(uuid, newBalance, System.currentTimeMillis()))
-                {
-                    return new BalanceChange(BalanceChangeResult.ACCOUNT_NOT_FOUND, newAmount, currentBalance);
-                }
-
-                return new BalanceChange(BalanceChangeResult.SUCCESS, newAmount, newBalance);
-            }
-            catch (SQLException e)
-            {
-                throw new CompletionException(e);
-            }
-        });
+            });
+        }
     }
 
     public CompletableFuture<BalanceChange> setBalance(UUID uuid, BigDecimal balance)
     {
-        BalanceChange loadedAccountBalanceChange = setLoadedAccountBalance(uuid, balance);
+        BalanceChange balanceChange = setLoadedAccountBalance(uuid, balance);
 
-        if (loadedAccountBalanceChange.result() != BalanceChangeResult.ACCOUNT_NOT_FOUND)
+        if (balanceChange.result() != BalanceChangeResult.ACCOUNT_NOT_FOUND)
         {
-            return CompletableFuture.completedFuture(loadedAccountBalanceChange);
+            return CompletableFuture.completedFuture(balanceChange);
         }
 
-        return submitDatabaseTask(() ->
+        synchronized (accountLifecycleLock)
         {
-            BalanceChange newlyLoadedAccountBalanceChange = setLoadedAccountBalance(uuid, balance); // The player's account may have become loaded while this task was waiting in the database executor
+            balanceChange = setLoadedAccountBalance(uuid, balance);
 
-            if (newlyLoadedAccountBalanceChange.result() != BalanceChangeResult.ACCOUNT_NOT_FOUND)
+            if (balanceChange.result() != BalanceChangeResult.ACCOUNT_NOT_FOUND)
             {
-                return newlyLoadedAccountBalanceChange;
+                return CompletableFuture.completedFuture(balanceChange);
             }
 
-            // Set the balance in the database
-            try
+            return submitDatabaseTask(() ->
             {
-                ConfigSnapshot config = instance.getConfigSnapshot();
-
-                int decimalPlaces = instance.getDecimalPlaces();
-
-                BigDecimal newBalance = Util.round(balance, decimalPlaces, RoundingMode.valueOf(config.getString("settings.currency.rounding-mode"))).stripTrailingZeros();
-
-                if (newBalance.compareTo(BigDecimal.ZERO) < 0)
+                try
                 {
-                    return new BalanceChange(BalanceChangeResult.NEGATIVE_AMOUNT, newBalance, getBalanceFromDatabase(uuid));
-                }
+                    ConfigSnapshot config = instance.getConfigSnapshot();
 
-                if (newBalance.scale() > decimalPlaces)
-                {
-                    return new BalanceChange(BalanceChangeResult.TOO_MANY_DECIMAL_PLACES_AMOUNT, newBalance, getBalanceFromDatabase(uuid));
-                }
+                    int decimalPlaces = instance.getDecimalPlaces();
 
-                if (newBalance.compareTo(new BigDecimal(config.getString("settings.currency.max-balance"))) > 0)
-                {
-                    return new BalanceChange(BalanceChangeResult.ABOVE_MAXIMUM_BALANCE, newBalance, getBalanceFromDatabase(uuid));
-                }
+                    BigDecimal newBalance = Util.round(balance, decimalPlaces, RoundingMode.valueOf(config.getString("settings.currency.rounding-mode"))).stripTrailingZeros();
 
-                // Don't actually make a change if the player's balance is equal to what it is being set to
-                BigDecimal currentBalance = getBalanceFromDatabase(uuid);
-                if (currentBalance == null)
-                {
-                    return new BalanceChange(BalanceChangeResult.ACCOUNT_NOT_FOUND, newBalance, null);
-                }
-                if (currentBalance.compareTo(newBalance) == 0)
-                {
-                    return new BalanceChange(BalanceChangeResult.SUCCESS, newBalance, currentBalance);
-                }
+                    if (newBalance.compareTo(BigDecimal.ZERO) < 0)
+                    {
+                        return new BalanceChange(BalanceChangeResult.NEGATIVE_AMOUNT, newBalance, getBalanceFromDatabase(uuid));
+                    }
 
-                if (!setBalanceInDatabase(uuid, newBalance, System.currentTimeMillis()))
-                {
-                    return new BalanceChange(BalanceChangeResult.ACCOUNT_NOT_FOUND, newBalance, getBalanceFromDatabase(uuid));
-                }
+                    if (newBalance.scale() > decimalPlaces)
+                    {
+                        return new BalanceChange(BalanceChangeResult.TOO_MANY_DECIMAL_PLACES_AMOUNT, newBalance, getBalanceFromDatabase(uuid));
+                    }
 
-                return new BalanceChange(BalanceChangeResult.SUCCESS, newBalance, newBalance);
-            }
-            catch (SQLException e)
-            {
-                throw new CompletionException(e);
-            }
-        });
+                    if (newBalance.compareTo(new BigDecimal(config.getString("settings.currency.max-balance"))) > 0)
+                    {
+                        return new BalanceChange(BalanceChangeResult.ABOVE_MAXIMUM_BALANCE, newBalance, getBalanceFromDatabase(uuid));
+                    }
+
+                    BigDecimal currentBalance = getBalanceFromDatabase(uuid);
+
+                    if (currentBalance == null)
+                    {
+                        return new BalanceChange(BalanceChangeResult.ACCOUNT_NOT_FOUND, newBalance, null);
+                    }
+
+                    if (currentBalance.compareTo(newBalance) == 0)
+                    {
+                        return new BalanceChange(BalanceChangeResult.SUCCESS, newBalance, currentBalance);
+                    }
+
+                    if (!setBalanceInDatabase(uuid, newBalance, System.currentTimeMillis()))
+                    {
+                        return new BalanceChange(BalanceChangeResult.ACCOUNT_NOT_FOUND, newBalance, getBalanceFromDatabase(uuid));
+                    }
+
+                    return new BalanceChange(BalanceChangeResult.SUCCESS, newBalance, newBalance);
+                }
+                catch (SQLException e)
+                {
+                    throw new CompletionException(e);
+                }
+            });
+        }
     }
 
     public CompletableFuture<Boolean> getAcceptingPayments(UUID uuid)
@@ -916,23 +902,25 @@ public class PlayerAccountManager
             return CompletableFuture.completedFuture(true);
         }
 
-        return submitDatabaseTask(() ->
+        synchronized (accountLifecycleLock)
         {
-            if (setLoadedAccountAcceptingPayments(uuid, acceptingPayments)) // The player's account may have become loaded while this task was waiting in the database executor
+            if (setLoadedAccountAcceptingPayments(uuid, acceptingPayments))
             {
-                return true;
+                return CompletableFuture.completedFuture(true);
             }
 
-            // Set the "accepting_payments" value in the database
-            try
+            return submitDatabaseTask(() ->
             {
-                return setAcceptingPaymentsInDatabase(uuid, acceptingPayments);
-            }
-            catch (SQLException e)
-            {
-                throw new CompletionException(e);
-            }
-        });
+                try
+                {
+                    return setAcceptingPaymentsInDatabase(uuid, acceptingPayments);
+                }
+                catch (SQLException e)
+                {
+                    throw new CompletionException(e);
+                }
+            });
+        }
     }
 
     public CompletableFuture<Boolean> toggleAcceptingPayments(UUID uuid)
@@ -944,38 +932,41 @@ public class PlayerAccountManager
             return CompletableFuture.completedFuture(acceptingPayments);
         }
 
-        return submitDatabaseTask(() ->
+        synchronized (accountLifecycleLock)
         {
-            Boolean newlyLoadedAcceptingPayments = toggleLoadedAccountAcceptingPayments(uuid);
+            acceptingPayments = toggleLoadedAccountAcceptingPayments(uuid);
 
-            if (newlyLoadedAcceptingPayments != null)
+            if (acceptingPayments != null)
             {
-                return newlyLoadedAcceptingPayments;
+                return CompletableFuture.completedFuture(acceptingPayments);
             }
 
-            try
+            return submitDatabaseTask(() ->
             {
-                Boolean currentAcceptingPayments = getAcceptingPaymentsFromDatabase(uuid);
-
-                if (currentAcceptingPayments == null)
+                try
                 {
-                    return null;
+                    Boolean currentAcceptingPayments = getAcceptingPaymentsFromDatabase(uuid);
+
+                    if (currentAcceptingPayments == null)
+                    {
+                        return null;
+                    }
+
+                    boolean newAcceptingPayments = !currentAcceptingPayments;
+
+                    if (!setAcceptingPaymentsInDatabase(uuid, newAcceptingPayments))
+                    {
+                        return null;
+                    }
+
+                    return newAcceptingPayments;
                 }
-
-                boolean newAcceptingPayments = !currentAcceptingPayments;
-
-                if (!setAcceptingPaymentsInDatabase(uuid, newAcceptingPayments))
+                catch (SQLException e)
                 {
-                    return null;
+                    throw new CompletionException(e);
                 }
-
-                return newAcceptingPayments;
-            }
-            catch (SQLException e)
-            {
-                throw new CompletionException(e);
-            }
-        });
+            });
+        }
     }
 
     /*
@@ -1005,28 +996,31 @@ public class PlayerAccountManager
             return CompletableFuture.completedFuture(new MoneyTransfer(MoneyTransferResult.TOO_MANY_DECIMAL_PLACES_AMOUNT, newAmount, null, null));
         }
 
-        return submitDatabaseTask(() ->
+        synchronized (accountLifecycleLock)
         {
             PlayerAccount senderAccount = loadedAccounts.get(senderUuid);
             PlayerAccount targetAccount = loadedAccounts.get(targetUuid);
 
-            if (senderAccount != null && targetAccount != null)
+            return submitDatabaseTask(() ->
             {
-                return transferMoneyBetweenLoadedAccounts(senderAccount, targetAccount, newAmount);
-            }
+                if (senderAccount != null && targetAccount != null)
+                {
+                    return transferMoneyBetweenLoadedAccounts(senderAccount, targetAccount, newAmount);
+                }
 
-            if (senderAccount != null)
-            {
-                return transferMoneyFromLoadedToUnloadedAccount(senderAccount, targetUuid, newAmount);
-            }
+                if (senderAccount != null)
+                {
+                    return transferMoneyFromLoadedToUnloadedAccount(senderAccount, targetUuid, newAmount);
+                }
 
-            if (targetAccount != null)
-            {
-                return transferMoneyFromUnloadedToLoadedAccount(senderUuid, targetAccount, newAmount);
-            }
+                if (targetAccount != null)
+                {
+                    return transferMoneyFromUnloadedToLoadedAccount(senderUuid, targetAccount, newAmount);
+                }
 
-            return transferMoneyBetweenUnloadedAccounts(senderUuid, targetUuid, newAmount);
-        });
+                return transferMoneyBetweenUnloadedAccounts(senderUuid, targetUuid, newAmount);
+            });
+        }
     }
 
     private MoneyTransfer transferMoneyBetweenLoadedAccounts(PlayerAccount senderAccount, PlayerAccount targetAccount, BigDecimal amount)
@@ -1685,9 +1679,16 @@ public class PlayerAccountManager
 
             connection.commit();
         }
-        catch (SQLException e)
+        catch (SQLException | RuntimeException e)
         {
-            connection.rollback();
+            try
+            {
+                connection.rollback();
+            }
+            catch (SQLException rollbackException)
+            {
+                e.addSuppressed(rollbackException);
+            }
 
             throw e;
         }

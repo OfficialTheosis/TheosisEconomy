@@ -135,18 +135,27 @@ public class DatabaseManager
             executorLifecycleLock.writeLock().unlock();
         }
 
-        try
-        {
-            if (!databaseExecutor.awaitTermination(30, TimeUnit.SECONDS))
-            {
-                instance.getLogger().log(Level.SEVERE, "Database tasks did not finish before shutdown.");
+        boolean interrupted = false;
 
-                databaseExecutor.shutdownNow();
+        while (true)
+        {
+            try
+            {
+                if (databaseExecutor.awaitTermination(30, TimeUnit.SECONDS))
+                {
+                    break;
+                }
+
+                instance.getLogger().log(Level.WARNING, "Database tasks are still finishing during shutdown.");
+            }
+            catch (InterruptedException ignored)
+            {
+                interrupted = true;
             }
         }
-        catch (InterruptedException ignored)
+
+        if (interrupted)
         {
-            databaseExecutor.shutdownNow();
             Thread.currentThread().interrupt();
         }
     }

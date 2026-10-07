@@ -29,7 +29,7 @@ public class AsyncPlayerPreLoginListener implements Listener
 
         try
         {
-            instance.getPlayerAccountManager().loadOrCreateAccount(event.getUniqueId(), event.getName()).join();
+            instance.getPlayerAccountManager().loadOrCreateAccount(event.getUniqueId(), event.getName());
         }
         catch (CompletionException e)
         {

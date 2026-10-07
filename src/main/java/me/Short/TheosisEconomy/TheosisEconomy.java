@@ -233,7 +233,10 @@ public class TheosisEconomy extends JavaPlugin
         }
 
         // Un-register this plugin as a Vault economy provider
-        getServer().getServicesManager().unregister(net.milkbowl.vault.economy.Economy.class, vaultEconomy);
+        if (vaultEconomy != null)
+        {
+            getServer().getServicesManager().unregister(net.milkbowl.vault.economy.Economy.class, vaultEconomy);
+        }
 
         // Un-register PlaceholderAPI
         if (placeholderApi != null)
