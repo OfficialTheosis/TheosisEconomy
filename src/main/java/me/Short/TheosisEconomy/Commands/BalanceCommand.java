@@ -1,7 +1,6 @@
 package me.Short.TheosisEconomy.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -15,7 +14,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.jspecify.annotations.Nullable;
 
 import java.util.UUID;
 import java.util.logging.Level;
@@ -23,7 +21,7 @@ import java.util.logging.Level;
 public class BalanceCommand
 {
 
-    public static LiteralCommandNode<CommandSourceStack> createCommand(final String commandName, TheosisEconomy instance)
+    public static LiteralCommandNode<CommandSourceStack> createCommand(final String commandName, final TheosisEconomy instance)
     {
         return Commands.literal(commandName)
 
@@ -31,7 +29,7 @@ public class BalanceCommand
 
                 .executes(ctx ->
                 {
-                    executeCommandLogic(instance, ctx, null);
+                    executeCommandLogic(instance, ctx.getSource().getSender(), null);
 
                     return Command.SINGLE_SUCCESS;
                 })
@@ -43,7 +41,7 @@ public class BalanceCommand
 
                         .executes(ctx ->
                         {
-                            executeCommandLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class));
+                            executeCommandLogic(instance, ctx.getSource().getSender(), ctx.getArgument("target player", OfflinePlayer.class));
 
                             return Command.SINGLE_SUCCESS;
                         })
@@ -51,10 +49,8 @@ public class BalanceCommand
     }
 
     // Execute the command logic
-    private static void executeCommandLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, @Nullable OfflinePlayer target)
+    private static void executeCommandLogic(TheosisEconomy instance, CommandSender sender, OfflinePlayer target)
     {
-        CommandSender sender = ctx.getSource().getSender();
-
         if (target == null)
         {
             if (!(sender instanceof Player))

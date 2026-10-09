@@ -2,7 +2,6 @@ package me.Short.TheosisEconomy.Commands;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
-import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -26,7 +25,7 @@ import java.util.logging.Level;
 public class EconomyCommand
 {
 
-    public static LiteralCommandNode<CommandSourceStack> createCommand(final String commandName, TheosisEconomy instance)
+    public static LiteralCommandNode<CommandSourceStack> createCommand(final String commandName, final TheosisEconomy instance)
     {
         return Commands.literal(commandName)
 
@@ -73,7 +72,7 @@ public class EconomyCommand
 
                                         .executes(ctx ->
                                         {
-                                            executeSetLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), DoubleArgumentType.getDouble(ctx, "amount"));
+                                            executeSetLogic(instance, ctx.getSource().getSender(), ctx.getArgument("target player", OfflinePlayer.class), DoubleArgumentType.getDouble(ctx, "amount"));
 
                                             return Command.SINGLE_SUCCESS;
                                         })
@@ -114,7 +113,7 @@ public class EconomyCommand
 
                                         .executes(ctx ->
                                         {
-                                            executeGiveLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), DoubleArgumentType.getDouble(ctx, "amount"));
+                                            executeGiveLogic(instance, ctx.getSource().getSender(), ctx.getArgument("target player", OfflinePlayer.class), DoubleArgumentType.getDouble(ctx, "amount"));
 
                                             return Command.SINGLE_SUCCESS;
                                         })
@@ -155,7 +154,7 @@ public class EconomyCommand
 
                                         .executes(ctx ->
                                         {
-                                            executeTakeLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), DoubleArgumentType.getDouble(ctx, "amount"));
+                                            executeTakeLogic(instance, ctx.getSource().getSender(), ctx.getArgument("target player", OfflinePlayer.class), DoubleArgumentType.getDouble(ctx, "amount"));
 
                                             return Command.SINGLE_SUCCESS;
                                         })
@@ -183,7 +182,7 @@ public class EconomyCommand
 
                                 .executes(ctx ->
                                 {
-                                    executeResetLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class));
+                                    executeResetLogic(instance, ctx.getSource().getSender(), ctx.getArgument("target player", OfflinePlayer.class));
 
                                     return Command.SINGLE_SUCCESS;
                                 })
@@ -197,7 +196,7 @@ public class EconomyCommand
 
                         .executes(ctx ->
                         {
-                            executeReloadLogic(instance, ctx);
+                            executeReloadLogic(instance, ctx.getSource().getSender());
 
                             return Command.SINGLE_SUCCESS;
                         })
@@ -205,10 +204,8 @@ public class EconomyCommand
     }
 
     // Execute the logic for the "set" sub-command
-    private static void executeSetLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, double amount)
+    private static void executeSetLogic(TheosisEconomy instance, CommandSender sender, OfflinePlayer target, double amount)
     {
-        CommandSender sender = ctx.getSource().getSender();
-
         UUID targetUuid = target.getUniqueId();
 
         instance.getPlayerAccountManager().setBalance(targetUuid, BigDecimal.valueOf(amount)).whenComplete((balanceChange, throwable) ->
@@ -288,10 +285,8 @@ public class EconomyCommand
     }
 
     // Execute the logic for the "give" sub-command
-    private static void executeGiveLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, double amount)
+    private static void executeGiveLogic(TheosisEconomy instance, CommandSender sender, OfflinePlayer target, double amount)
     {
-        CommandSender sender = ctx.getSource().getSender();
-
         UUID targetUuid = target.getUniqueId();
 
         instance.getPlayerAccountManager().addToBalance(targetUuid, BigDecimal.valueOf(amount)).whenComplete((balanceChange, throwable) ->
@@ -375,10 +370,8 @@ public class EconomyCommand
     }
 
     // Execute the logic for the "take" sub-command
-    private static void executeTakeLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, double amount)
+    private static void executeTakeLogic(TheosisEconomy instance, CommandSender sender, OfflinePlayer target, double amount)
     {
-        CommandSender sender = ctx.getSource().getSender();
-
         UUID targetUuid = target.getUniqueId();
 
         instance.getPlayerAccountManager().subtractFromBalance(targetUuid, BigDecimal.valueOf(amount)).whenComplete((balanceChange, throwable) ->
@@ -462,13 +455,11 @@ public class EconomyCommand
     }
 
     // Execute the logic for the "reset" sub-command
-    private static void executeResetLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target)
+    private static void executeResetLogic(TheosisEconomy instance, CommandSender sender, OfflinePlayer target)
     {
-        ConfigSnapshot config = instance.getConfigSnapshot();
-
-        CommandSender sender = ctx.getSource().getSender();
-
         UUID targetUuid = target.getUniqueId();
+
+        ConfigSnapshot config = instance.getConfigSnapshot();
 
         instance.getPlayerAccountManager().setBalance(targetUuid, BigDecimal.valueOf(config.getDouble("settings.currency.default-balance"))).whenComplete((balanceChange, throwable) ->
         {
@@ -544,13 +535,13 @@ public class EconomyCommand
     }
 
     // Execute the logic for the "reload" sub-command
-    private static void executeReloadLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx)
+    private static void executeReloadLogic(TheosisEconomy instance, CommandSender sender)
     {
         Bukkit.getGlobalRegionScheduler().execute(instance, () ->
         {
             instance.reload();
 
-            instance.getMessageSender().sendConfigMiniMessage(ctx.getSource().getSender(), MessageType.CHAT, "messages.economy.reload");
+            instance.getMessageSender().sendConfigMiniMessage(sender, MessageType.CHAT, "messages.economy.reload");
         });
     }
 

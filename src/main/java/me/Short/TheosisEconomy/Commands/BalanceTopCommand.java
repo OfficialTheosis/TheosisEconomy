@@ -2,7 +2,6 @@ package me.Short.TheosisEconomy.Commands;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -33,7 +32,7 @@ import java.util.logging.Level;
 public class BalanceTopCommand
 {
 
-    public static LiteralCommandNode<CommandSourceStack> createCommand(final String commandName, TheosisEconomy instance)
+    public static LiteralCommandNode<CommandSourceStack> createCommand(final String commandName, final TheosisEconomy instance)
     {
         return Commands.literal(commandName)
 
@@ -42,7 +41,7 @@ public class BalanceTopCommand
                 // No page number specified, so pass 1
                 .executes(ctx ->
                 {
-                    executeCommandLogic(instance, ctx, 1);
+                    executeCommandLogic(instance, ctx.getSource().getSender(), 1);
 
                     return Command.SINGLE_SUCCESS;
                 })
@@ -52,8 +51,7 @@ public class BalanceTopCommand
 
                         .executes(ctx ->
                         {
-                            // Execute command logic if a page number was specified
-                            executeCommandLogic(instance, ctx, IntegerArgumentType.getInteger(ctx, "page number"));
+                            executeCommandLogic(instance, ctx.getSource().getSender(), IntegerArgumentType.getInteger(ctx, "page number"));
 
                             return Command.SINGLE_SUCCESS;
                         })
@@ -61,10 +59,8 @@ public class BalanceTopCommand
     }
 
     // Execute the command logic
-    private static void executeCommandLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, int pageNumber)
+    private static void executeCommandLogic(TheosisEconomy instance, CommandSender sender, int pageNumber)
     {
-        CommandSender sender = ctx.getSource().getSender();
-
         PlayerAccountManager playerAccountManager = instance.getPlayerAccountManager();
 
         UUID senderUuid = sender instanceof Player senderPlayer ? senderPlayer.getUniqueId() : null;

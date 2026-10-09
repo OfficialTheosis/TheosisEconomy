@@ -63,7 +63,7 @@ public class CachedOfflinePlayerArgument implements CustomArgumentType<OfflinePl
         reader.setCursor(reader.getCursor() + specifiedName.length());
 
         // Get target player if cached
-        final OfflinePlayer target = Bukkit.getOfflinePlayerIfCached(specifiedName);
+        OfflinePlayer target = Bukkit.getOfflinePlayerIfCached(specifiedName);
 
         // Throw error if a target player was not found (i.e. no target player cached by the specified name)
         if (target == null)

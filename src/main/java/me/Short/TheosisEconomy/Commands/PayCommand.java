@@ -2,7 +2,6 @@ package me.Short.TheosisEconomy.Commands;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
-import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -19,16 +18,13 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.math.BigDecimal;
-import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 public class PayCommand
 {
 
-    public static LiteralCommandNode<CommandSourceStack> createCommand(final String commandName, TheosisEconomy instance)
+    public static LiteralCommandNode<CommandSourceStack> createCommand(final String commandName, final TheosisEconomy instance)
     {
         return Commands.literal(commandName)
 
@@ -47,24 +43,6 @@ public class PayCommand
                 // Target player argument
                 .then(Commands.argument("target player", new CachedOfflinePlayerArgument(instance))
 
-                        .suggests((ctx, builder) -> CompletableFuture.supplyAsync(() ->
-                        {
-                            if (ctx.getSource().getSender() instanceof Player senderPlayer)
-                            {
-                                UUID senderUuid = senderPlayer.getUniqueId();
-
-                                String remainingLowerCase = builder.getRemainingLowerCase();
-
-                                instance.getMostRecentPlayerNamesStore().getMostRecentPlayerNamesSnapshot().entrySet().stream()
-                                        .filter(entry -> !senderUuid.equals(entry.getKey()))
-                                        .map(Map.Entry::getValue)
-                                        .filter(name -> Util.nameMatchesSubstring(remainingLowerCase, name.toLowerCase(Locale.ROOT)))
-                                        .forEach(builder::suggest);
-                            }
-
-                            return builder.build();
-                        }))
-
                         // Send "incorrect usage" message because more arguments are required
                         .executes(ctx ->
                         {
@@ -80,7 +58,7 @@ public class PayCommand
 
                                 .executes(ctx ->
                                 {
-                                    executeCommandLogic(instance, ctx, ctx.getArgument("target player", OfflinePlayer.class), DoubleArgumentType.getDouble(ctx, "amount"));
+                                    executeCommandLogic(instance, ctx.getSource().getSender(), ctx.getArgument("target player", OfflinePlayer.class), DoubleArgumentType.getDouble(ctx, "amount"));
 
                                     return Command.SINGLE_SUCCESS;
                                 })
@@ -89,10 +67,8 @@ public class PayCommand
     }
 
     // Execute the command logic
-    private static void executeCommandLogic(TheosisEconomy instance, final CommandContext<CommandSourceStack> ctx, OfflinePlayer target, double amount)
+    private static void executeCommandLogic(TheosisEconomy instance, CommandSender sender, OfflinePlayer target, double amount)
     {
-        CommandSender sender = ctx.getSource().getSender();
-
         // If the sender is not player, return, because only players can pay money
         if (!(sender instanceof Player senderPlayer))
         {
