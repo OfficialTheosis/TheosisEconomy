@@ -322,61 +322,51 @@ public class TheosisEconomy extends JavaPlugin
                 }), 1L, configSnapshot.getLong("settings.placeholders.balancetop-cache.refresh-interval-seconds") * 20L);
     }
 
-    // Getter for "configSnapshot"
     public ConfigSnapshot getConfigSnapshot()
     {
         return configSnapshot;
     }
 
-    // Getter for "playerAccountManager"
     public PlayerAccountManager getPlayerAccountManager()
     {
         return playerAccountManager;
     }
 
-    // Getter for "messageSender"
     public MessageSender getMessageSender()
     {
         return messageSender;
     }
 
-    // Getter for "activityLogger"
     public Logger getActivityLogger()
     {
         return activityLogger;
     }
 
-    // Getter for "vaultPermission"
     public Permission getVaultPermission()
     {
         return vaultPermission;
     }
 
-    // Getter for "miniMessage"
     public MiniMessage getMiniMessage()
     {
         return miniMessage;
     }
 
-    // Getter for "legacyComponentSerializer"
     public LegacyComponentSerializer getLegacyComponentSerializer()
     {
         return legacyComponentSerializer;
     }
 
-    // Getter for "decimalPlaces"
     public int getDecimalPlaces()
     {
         return decimalPlaces;
     }
 
-    // Getter for "liteBansInstalled"
     public boolean getLiteBansInstalled()
     {
         return liteBansInstalled;
     }
 
-    // Getter for "mostRecentPlayerNamesStore"
     public MostRecentPlayerNamesStore getMostRecentPlayerNamesStore()
     {
         return mostRecentPlayerNamesStore;

@@ -18,7 +18,10 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.math.BigDecimal;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 public class PayCommand
@@ -42,6 +45,24 @@ public class PayCommand
 
                 // Target player argument
                 .then(Commands.argument("target player", new CachedOfflinePlayerArgument(instance))
+
+                        .suggests((ctx, builder) -> CompletableFuture.supplyAsync(() ->
+                        {
+                            if (ctx.getSource().getSender() instanceof Player senderPlayer)
+                            {
+                                UUID senderUuid = senderPlayer.getUniqueId();
+
+                                String remainingLowerCase = builder.getRemainingLowerCase();
+
+                                instance.getMostRecentPlayerNamesStore().getMostRecentPlayerNamesSnapshot().entrySet().stream()
+                                        .filter(entry -> !senderUuid.equals(entry.getKey()))
+                                        .map(Map.Entry::getValue)
+                                        .filter(name -> Util.nameMatchesSubstring(remainingLowerCase, name.toLowerCase(Locale.ROOT)))
+                                        .forEach(builder::suggest);
+                            }
+
+                            return builder.build();
+                        }))
 
                         // Send "incorrect usage" message because more arguments are required
                         .executes(ctx ->
@@ -163,7 +184,8 @@ public class PayCommand
                                 Placeholder.component("target", Component.text(targetName != null ? targetName : targetUuid.toString())));
                     }
 
-                    case INSUFFICIENT_FUNDS -> instance.getMessageSender().sendConfigMiniMessage(senderPlayer, MessageType.CHAT, "messages.pay.insufficient-funds");
+                    case INSUFFICIENT_FUNDS -> instance.getMessageSender().sendConfigMiniMessage(senderPlayer, MessageType.CHAT, "messages.pay.insufficient-funds",
+                            Placeholder.component("amount", Component.text(Util.formatMoney(instance, moneyTransfer.amount()))));
 
                     case ABOVE_MAXIMUM_BALANCE ->
                     {
